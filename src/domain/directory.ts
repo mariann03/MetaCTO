@@ -1,0 +1,107 @@
+import { asc, eq, sql } from "drizzle-orm";
+import { createInsertSchema } from "drizzle-zod";
+import { z } from "zod";
+import { accounts, settings, users } from "@/db/schema";
+import type { DbDeps } from "./deps";
+
+// Fixture shapes are derived from the tables, so a schema change can't drift
+// silently from the seed data. Users reference accounts by fixture key.
+// Strict objects: a misspelled key is an error, not a silently applied default.
+export const accountFixtureSchema = createInsertSchema(accounts, {
+  arr: (s) => s.positive(),
+})
+  .required({ churnRisk: true })
+  .strict();
+
+export const userFixtureSchema = createInsertSchema(users)
+  .omit({ accountId: true })
+  .extend({ accountKey: z.string().min(1).nullable() })
+  .strict()
+  .refine((u) => u.role !== "pm" || u.accountKey === null, {
+    message: "PM users cannot belong to an account",
+  });
+
+const directoryFixturesSchema = z.strictObject({
+  accounts: z.array(accountFixtureSchema),
+  users: z.array(userFixtureSchema),
+  strategy: z.string(),
+});
+
+/** Seed input: accounts, users (referencing accounts by fixture key) and the strategy document. */
+export type DirectoryFixtures = z.infer<typeof directoryFixturesSchema>;
+
+/** Validates raw fixture data (e.g. parsed JSON files) before seeding. */
+export function parseDirectoryFixtures(raw: unknown): DirectoryFixtures {
+  return directoryFixturesSchema.parse(raw);
+}
+
+const STRATEGY_KEY = "strategy";
+
+/** Loads accounts, users and the strategy document; safe to run repeatedly. */
+export async function seedDirectory(
+  { db }: DbDeps,
+  fixtures: DirectoryFixtures,
+) {
+  await db.transaction(async (tx) => {
+    const accountIds = new Map<string, number>();
+    for (const a of fixtures.accounts) {
+      const [row] = await tx
+        .insert(accounts)
+        .values(a)
+        .onConflictDoUpdate({ target: accounts.key, set: a })
+        .returning({ id: accounts.id });
+      if (row) accountIds.set(a.key, row.id);
+    }
+
+    for (const u of fixtures.users) {
+      const accountId = u.accountKey ? accountIds.get(u.accountKey) : null;
+      if (accountId === undefined)
+        throw new Error(
+          `User ${u.key} references unknown account ${u.accountKey}`,
+        );
+      const values = { key: u.key, name: u.name, role: u.role, accountId };
+      await tx
+        .insert(users)
+        .values(values)
+        .onConflictDoUpdate({ target: users.key, set: values });
+    }
+
+    await tx
+      .insert(settings)
+      .values({ key: STRATEGY_KEY, value: fixtures.strategy })
+      .onConflictDoUpdate({
+        target: settings.key,
+        set: { value: fixtures.strategy },
+      });
+  });
+}
+
+export async function listUsers({ db }: DbDeps) {
+  const rows = await db
+    .select({
+      id: users.id,
+      name: users.name,
+      role: users.role,
+      accountName: accounts.name,
+    })
+    .from(users)
+    .leftJoin(accounts, eq(users.accountId, accounts.id))
+    // Submitters first; within a role, customers before internal staff, then by name.
+    .orderBy(asc(users.role), sql`${users.accountId} is null`, asc(users.name));
+
+  return rows.map(({ accountName, ...user }) => ({
+    ...user,
+    account: accountName ? { name: accountName } : null,
+  }));
+}
+
+/** A user as listed by the role switcher: id, name, role and their account (null for staff and PMs). */
+export type DirectoryUser = Awaited<ReturnType<typeof listUsers>>[number];
+
+export async function getStrategy({ db }: DbDeps): Promise<string> {
+  const [row] = await db
+    .select({ value: settings.value })
+    .from(settings)
+    .where(eq(settings.key, STRATEGY_KEY));
+  return typeof row?.value === "string" ? row.value : "";
+}

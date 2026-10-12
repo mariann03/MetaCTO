@@ -1,0 +1,122 @@
+[
+  {
+    "key": "p-01",
+    "statement": "At period end, owners and bookkeepers need to hand their external accountant or tax preparer a complete set of books (GL detail, trial balance, aging, bank recs) in a shape the accountant can use, without hours of manual reassembly.",
+    "area": "exports",
+    "notes": "Near neighbour of p-02 (audit-trail export for compliance) and p-17 (continuous GL sync). Key signal: a periodic handoff of the books themselves, not change history and not an ongoing integration. Often phrased as a file format (CSV, XLSX, IIF, Xero file)."
+  },
+  {
+    "key": "p-02",
+    "statement": "Finance and compliance teams at audited or regulated companies need a tamper-evident history of who created, changed, approved or deleted financial records, which they can produce for auditors.",
+    "area": "compliance",
+    "notes": "Easily confused with p-01 because requests say 'export for our auditors'. The need is change history and accountability (who/when/old/new), not the ledger. Also brushes p-12 when the trigger is a sensitive field being changed."
+  },
+  {
+    "key": "p-03",
+    "statement": "Managers need to review and approve employees' expense claims before they are reimbursed, with routing based on amount, category or team.",
+    "area": "approvals",
+    "notes": "Near neighbour of p-04 (vendor bill approvals). Distinguish by what is being approved: employee out-of-pocket spend and reimbursement vs supplier invoices in AP. Words like 'expenses' appear in both (property 'maintenance expenses' are bills)."
+  },
+  {
+    "key": "p-04",
+    "statement": "AP teams need vendor bills checked and approved by the responsible budget owner before they are scheduled for payment, so nothing is paid that shouldn't be.",
+    "area": "approvals",
+    "notes": "Near neighbour of p-03. Vendor/supplier/contractor/subcontractor invoices, segregation of duties between entering and paying. Not employee reimbursements."
+  },
+  {
+    "key": "p-05",
+    "statement": "Businesses selling internationally need to invoice and get paid in their customers' currencies and see what they actually received in their home currency, including FX differences.",
+    "area": "invoicing",
+    "notes": "Near neighbour of p-06. This is a single legal entity billing in foreign currency. Currency translation of a foreign subsidiary for group reporting belongs to p-06. EU VAT reverse charge belongs to p-14."
+  },
+  {
+    "key": "p-06",
+    "statement": "Groups with several legal entities need consolidated financial statements across entities, with intercompany activity eliminated, without stitching spreadsheets together.",
+    "area": "reporting",
+    "notes": "Near neighbour of p-05 (mentions currencies when subsidiaries are abroad) and p-12 (entity-level access). Signal: several entities/LLCs/subsidiaries rolled up into one view."
+  },
+  {
+    "key": "p-07",
+    "statement": "Bookkeepers spend hours manually matching bank transactions to invoices and bills, especially when one deposit covers many invoices, amounts arrive net of fees, or references are unclear.",
+    "area": "reconciliation",
+    "notes": "Hot problem. Near neighbour of p-08 (feed missing data) and p-19 (recording partial payments). Here the transactions are present but matching them is slow or fails."
+  },
+  {
+    "key": "p-08",
+    "statement": "Bank connections silently stop syncing or sync incompletely, so transactions go missing and users don't notice until balances are wrong.",
+    "area": "bank_feeds",
+    "notes": "Near neighbour of p-07: users often describe it as 'can't reconcile'. Signal: transactions absent, duplicated after reconnect, or connection broken without warning."
+  },
+  {
+    "key": "p-09",
+    "statement": "Businesses get paid late and waste time chasing overdue invoices because follow-up with customers is manual and inconsistent.",
+    "area": "receivables",
+    "notes": "Near neighbour of p-10 (making it easy to pay) and p-15 (overdue invoices on a cash dashboard). Signal: follow-up/chasing/reminders/statements after the invoice is sent."
+  },
+  {
+    "key": "p-10",
+    "statement": "Customers want to pay an invoice immediately by card or bank transfer from the invoice itself, and the business wants that payment recorded automatically.",
+    "area": "payments",
+    "notes": "Near neighbour of p-09. Some requests mention reminders but the real blocker is that paying is inconvenient (checks, wires)."
+  },
+  {
+    "key": "p-11",
+    "statement": "IT teams at larger customers need Ledgerly sign-in and user lifecycle managed centrally through their identity provider, including MFA policy and instant deprovisioning.",
+    "area": "security",
+    "notes": "Near neighbour of p-12: both are 'access'. This is authentication and account lifecycle, not what a signed-in user can see or do."
+  },
+  {
+    "key": "p-12",
+    "statement": "Admins need to control which users can see or change which data (by entity, department or sensitive area like payroll or vendor bank details), beyond the fixed Admin/Finance/Viewer roles.",
+    "area": "permissions",
+    "notes": "Near neighbour of p-11 (an IT admin asking for 'access control' may mean either) and p-20 (accountant access across clients)."
+  },
+  {
+    "key": "p-13",
+    "statement": "Businesses that bill the same customers on a fixed schedule need those invoices created and sent automatically instead of rebuilding them every period.",
+    "area": "invoicing",
+    "notes": "Often requested as a 'duplicate invoice' button. Distinct from p-09: the invoice is never sent late because nobody remembered to create it, not because the customer didn't pay."
+  },
+  {
+    "key": "p-14",
+    "statement": "Businesses selling across states or countries need the correct sales tax or VAT applied to invoices and reported, without looking up rates and rules by hand.",
+    "area": "tax",
+    "notes": "Small but strategically sensitive. EU VAT requests can look like p-05 (international invoicing)."
+  },
+  {
+    "key": "p-15",
+    "statement": "Owners and finance leads need to see their upcoming cash position from what is due in and due out, so cash shortfalls don't take them by surprise.",
+    "area": "reporting",
+    "notes": "Can be confused with p-09 when phrased as 'overdue invoices dashboard'. Signal: forward-looking cash position combining receivables and payables."
+  },
+  {
+    "key": "p-16",
+    "statement": "Businesses need invoices that carry their branding and the fields their customers require (PO numbers, project codes, terms) so invoices are accepted and paid without reissuing.",
+    "area": "invoicing",
+    "notes": "Mostly solution-shaped (logo, custom fields). Enterprise variant is about customer AP rejecting invoices missing PO numbers."
+  },
+  {
+    "key": "p-17",
+    "statement": "Companies that keep their general ledger in QuickBooks, Xero or NetSuite need Ledgerly transactions to flow there continuously and correctly, without duplicates or re-keying.",
+    "area": "integrations",
+    "notes": "Near neighbour of p-01. Signal: an ongoing integration that misbehaves (duplicates, missing refunds, latency) vs a one-off handoff file. Accountants submit both."
+  },
+  {
+    "key": "p-18",
+    "statement": "Expense evidence gets lost between purchase and month end; employees need to capture receipts at the moment they spend so finance doesn't have to chase them.",
+    "area": "expenses",
+    "notes": "Can be confused with p-03 when the symptom is 'approvals stuck because receipts are missing'."
+  },
+  {
+    "key": "p-19",
+    "statement": "Businesses need to record deposits, partial payments, progress billing and credits against invoices so the balance a customer owes is always correct.",
+    "area": "receivables",
+    "notes": "Near neighbour of p-07: a partial payment that 'won't reconcile' is really about recording it against the invoice."
+  },
+  {
+    "key": "p-20",
+    "statement": "External accountants and bookkeeping firms need to work across all of their clients' Ledgerly accounts from a single login, with the right access in each.",
+    "area": "partners",
+    "notes": "Long tail but strategically important (partner channel). Near neighbour of p-01 (accountant needs the books) and p-12 (access)."
+  }
+]

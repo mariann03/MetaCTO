@@ -1,0 +1,212 @@
+[
+  {
+    "key": "acc-01",
+    "name": "Brightside Bakery Co.",
+    "segment": "smb",
+    "arr": 4800,
+    "churnRisk": false
+  },
+  {
+    "key": "acc-02",
+    "name": "Hollis & Reed Landscaping",
+    "segment": "smb",
+    "arr": 7200,
+    "churnRisk": false
+  },
+  {
+    "key": "acc-03",
+    "name": "Pinecrest Dental Studio",
+    "segment": "smb",
+    "arr": 9600,
+    "churnRisk": true
+  },
+  {
+    "key": "acc-04",
+    "name": "Northloop Creative Agency",
+    "segment": "smb",
+    "arr": 12000,
+    "churnRisk": false
+  },
+  {
+    "key": "acc-05",
+    "name": "Saltwater Surf Supply",
+    "segment": "smb",
+    "arr": 5400,
+    "churnRisk": false
+  },
+  {
+    "key": "acc-06",
+    "name": "Kettle & Kiln Ceramics",
+    "segment": "smb",
+    "arr": 3600,
+    "churnRisk": false
+  },
+  {
+    "key": "acc-07",
+    "name": "Meridian Physical Therapy",
+    "segment": "smb",
+    "arr": 14400,
+    "churnRisk": false
+  },
+  {
+    "key": "acc-08",
+    "name": "Copperline Electrical Services",
+    "segment": "smb",
+    "arr": 18000,
+    "churnRisk": true
+  },
+  {
+    "key": "acc-09",
+    "name": "Juniper Event Rentals",
+    "segment": "smb",
+    "arr": 8400,
+    "churnRisk": false
+  },
+  {
+    "key": "acc-10",
+    "name": "Oakfield Veterinary Clinic",
+    "segment": "smb",
+    "arr": 11400,
+    "churnRisk": false
+  },
+  {
+    "key": "acc-11",
+    "name": "Tidewater Marine Repair",
+    "segment": "smb",
+    "arr": 6600,
+    "churnRisk": false
+  },
+  {
+    "key": "acc-12",
+    "name": "Lumen Yoga Collective",
+    "segment": "smb",
+    "arr": 3000,
+    "churnRisk": false
+  },
+  {
+    "key": "acc-13",
+    "name": "Fairbanks Freight Brokers",
+    "segment": "smb",
+    "arr": 22800,
+    "churnRisk": true
+  },
+  {
+    "key": "acc-14",
+    "name": "Silverleaf Bookkeeping Services",
+    "segment": "smb",
+    "arr": 16800,
+    "churnRisk": false
+  },
+  {
+    "key": "acc-15",
+    "name": "Harbor Street Coffee Roasters",
+    "segment": "smb",
+    "arr": 9000,
+    "churnRisk": false
+  },
+  {
+    "key": "acc-16",
+    "name": "Vantage Logistics Group",
+    "segment": "mid_market",
+    "arr": 64000,
+    "churnRisk": false
+  },
+  {
+    "key": "acc-17",
+    "name": "Greenway Property Management",
+    "segment": "mid_market",
+    "arr": 48000,
+    "churnRisk": false
+  },
+  {
+    "key": "acc-18",
+    "name": "Atlas Robotics Inc.",
+    "segment": "mid_market",
+    "arr": 96000,
+    "churnRisk": false
+  },
+  {
+    "key": "acc-19",
+    "name": "Solstice Travel Partners",
+    "segment": "mid_market",
+    "arr": 72000,
+    "churnRisk": true
+  },
+  {
+    "key": "acc-20",
+    "name": "Redwood Health Partners",
+    "segment": "mid_market",
+    "arr": 120000,
+    "churnRisk": false
+  },
+  {
+    "key": "acc-21",
+    "name": "Calder Manufacturing",
+    "segment": "mid_market",
+    "arr": 84000,
+    "churnRisk": false
+  },
+  {
+    "key": "acc-22",
+    "name": "Brightwater Hospitality Group",
+    "segment": "mid_market",
+    "arr": 56000,
+    "churnRisk": false
+  },
+  {
+    "key": "acc-23",
+    "name": "Kinetic Sports Labs",
+    "segment": "mid_market",
+    "arr": 38000,
+    "churnRisk": false
+  },
+  {
+    "key": "acc-24",
+    "name": "Parallax Software Studio",
+    "segment": "mid_market",
+    "arr": 42000,
+    "churnRisk": false
+  },
+  {
+    "key": "acc-25",
+    "name": "Evergreen Charter Schools Network",
+    "segment": "mid_market",
+    "arr": 145000,
+    "churnRisk": false
+  },
+  {
+    "key": "acc-26",
+    "name": "Halvorsen Industrial Holdings",
+    "segment": "enterprise",
+    "arr": 640000,
+    "churnRisk": false
+  },
+  {
+    "key": "acc-27",
+    "name": "Northstar Retail Group",
+    "segment": "enterprise",
+    "arr": 410000,
+    "churnRisk": false
+  },
+  {
+    "key": "acc-28",
+    "name": "Crescent Biotech Corporation",
+    "segment": "enterprise",
+    "arr": 285000,
+    "churnRisk": true
+  },
+  {
+    "key": "acc-29",
+    "name": "Pacifica Global Freight",
+    "segment": "enterprise",
+    "arr": 880000,
+    "churnRisk": false
+  },
+  {
+    "key": "acc-30",
+    "name": "Ironbridge Construction Partners",
+    "segment": "enterprise",
+    "arr": 230000,
+    "churnRisk": false
+  }
+]
