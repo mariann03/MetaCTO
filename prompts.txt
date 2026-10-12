@@ -250,4 +250,4 @@ Response: Committed and pushed ms change, merged PR #20 into main (merge commit)
 
 [2026-10-12T07:01:32Z]
 Prompt: /mattpocock-skills:implement #4 (submit request -> new Problem with draft fallback).
-Response: (in progress) Implementing #4 on branch feat/4-submit-request.
+Response: Implemented #4 on feat/4-submit-request (TDD): schema problems/problem_versions/requests/supports + migration; intake service (embed, top-k candidate retrieval, structured extraction with reasoning none, 3 attempts, draft fallback, AI statement version, implicit support, events, per-user hourly rate limit on submission attempts incl. resubmits, escaped prompt delimiters, draft-only conditional submit); Submit page + My requests with Submit again; deterministic fake intake model for E2E. Verified with real local Ollama models. Two-axis review fixes applied. 24 unit + 3 E2E green.
