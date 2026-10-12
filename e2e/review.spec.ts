@@ -1,32 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
-import users from "../data/fixtures/users.json";
-
-// Not the default user, whose submissions other specs already count toward the rate limit.
-const submitter = users.filter((u) => u.role === "submitter")[1]?.name ?? "";
-
-async function actAs(page: Page, option: RegExp) {
-  await page.goto("/");
-  const switcher = page.getByRole("combobox", { name: "Acting as" });
-  await switcher.click();
-  const choice = page.getByRole("option", { name: option }).first();
-  const label = (await choice.textContent())?.trim() ?? "";
-  await choice.click();
-  await expect(switcher).toContainText(label);
-}
-
-const asSubmitter = (page: Page) => actAs(page, new RegExp(`^${submitter} ·`));
-const asPm = (page: Page) => actAs(page, /· PM$/);
-
-/** Submits a request as the current user and waits for its result. */
-async function submit(page: Page, title: string) {
-  await page.goto("/submit");
-  await page.getByLabel("Title").fill(title);
-  await page
-    .getByLabel("What do you need, and why?")
-    .fill("We need this every month for our bookkeeping.");
-  await page.getByRole("button", { name: "Submit request" }).click();
-  await expect(page.getByRole("status").first()).toBeVisible();
-}
+import { asPm, asSubmitter, submit } from "./helpers";
 
 async function openQueueItem(page: Page, title: string) {
   await page.goto("/review");
@@ -38,7 +11,7 @@ const unique = (name: string) => `${name} ${Date.now()}`;
 
 test("a PM accepts a new problem", async ({ page }) => {
   const title = unique("review accept");
-  await asSubmitter(page);
+  await asSubmitter(page, 1);
   await submit(page, title);
 
   await asPm(page);
@@ -51,7 +24,7 @@ test("a PM accepts a new problem", async ({ page }) => {
 test("a PM moves a request into another problem", async ({ page }) => {
   const target = unique("review move target");
   const source = unique("review move source");
-  await asSubmitter(page);
+  await asSubmitter(page, 1);
   await submit(page, target);
   await submit(page, source);
 
@@ -62,7 +35,7 @@ test("a PM moves a request into another problem", async ({ page }) => {
   await item.getByRole("button", { name: "Move" }).click();
   await expect(item).toHaveCount(0);
 
-  await asSubmitter(page);
+  await asSubmitter(page, 1);
   await page.goto("/my-requests");
   await expect(
     page.getByText(`Problem: Customers need ${target}.`),
@@ -71,7 +44,7 @@ test("a PM moves a request into another problem", async ({ page }) => {
 
 test("a PM splits a disputed grouping into a new problem", async ({ page }) => {
   const title = unique("review split");
-  await asSubmitter(page);
+  await asSubmitter(page, 1);
   await submit(page, title);
   await submit(page, title);
   await page

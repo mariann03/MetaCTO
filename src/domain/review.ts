@@ -100,16 +100,6 @@ export async function listReviewQueue({ db }: DbDeps) {
 
 export type ReviewItem = Awaited<ReturnType<typeof listReviewQueue>>[number];
 
-export type ProblemOption = Awaited<ReturnType<typeof listProblems>>[number];
-
-/** Every Problem, for choosing where to move a request. */
-export async function listProblems({ db }: DbDeps) {
-  return db
-    .select({ id: problems.id, statement: problems.statement })
-    .from(problems)
-    .orderBy(asc(problems.id));
-}
-
 /** accept: the AI's placement stands; move: into another Problem; split: into a new Problem. */
 export type ReviewDecision =
   | { action: "accept" }

@@ -1,0 +1,237 @@
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  test,
+} from "bun:test";
+import { eq, inArray } from "drizzle-orm";
+import type { Db } from "@/db/client";
+import { EMBEDDING_DIMENSIONS, events, supports } from "@/db/schema";
+import { candidateIds, jsonResult, scriptedModels } from "../../test/ai";
+import {
+  prepareDatabase,
+  resetDatabase,
+  TEST_DATABASE_URL,
+} from "../../test/db";
+import { seedPeople } from "../../test/seed";
+import type { Deps } from "./deps";
+import { submitRequest } from "./intake";
+import { addSupport, findMatches, listProblems } from "./problems";
+
+/** Unit vector with these components on the first axes. */
+function vector(...components: number[]): number[] {
+  const norm = Math.hypot(...components);
+  return Array.from({ length: EMBEDDING_DIMENSIONS }, (_, i) =>
+    i < components.length ? (components[i] ?? 0) / norm : 0,
+  );
+}
+
+// Requests by title; the query resembles them at about .65, .58, .54, .43 and .32.
+const VECTORS: Record<string, number[]> = {
+  "Invoices A": vector(1),
+  "Invoices B": vector(0.9, 0, 0.436),
+  Payroll: vector(0, 0, 0, 1),
+  Receipts: vector(0, 0, 0, 0, 1),
+  Taxes: vector(0, 0, 0, 0, 0, 1),
+  Query: vector(0.6, 0, 0, 0.5, 0.4, 0.3),
+};
+
+const title = (prompt: unknown) =>
+  /<title>(.*?)<\/title>/.exec(JSON.stringify(prompt))?.[1] ?? "";
+
+/** "Invoices" requests are judged the same need; everything else starts its own Problem. */
+const deps = (db: Db): Deps => ({
+  db,
+  models: scriptedModels({
+    embed: (text) => VECTORS[text.split("\n")[0] ?? ""] ?? vector(0, 1),
+    generate: async ({ prompt }) => {
+      const name = title(prompt);
+      if (JSON.stringify(prompt).includes("<current_statement>"))
+        return jsonResult({ changed: false, statement: "" });
+      const [problemId] = candidateIds(prompt);
+      return jsonResult({
+        problemStatement: `Statement for ${name}`,
+        underlyingProblem: name,
+        proposedSolution: "",
+        persona: "Bookkeeper",
+        severity: "medium",
+        match:
+          problemId === undefined
+            ? null
+            : name.startsWith("Invoices")
+              ? { verdict: "same_problem", problemId, rationale: "Same need" }
+              : { verdict: "different", problemId: null, rationale: "New" },
+      });
+    },
+  }).models,
+});
+
+let db: Db;
+let people: Awaited<ReturnType<typeof seedPeople>>;
+
+beforeAll(async () => {
+  db = await prepareDatabase(TEST_DATABASE_URL);
+});
+beforeEach(async () => {
+  await resetDatabase(db);
+  people = await seedPeople(db);
+});
+afterAll(async () => {
+  await db.$client.end();
+});
+
+async function submit(name: string, authorId = people.alice) {
+  const result = await submitRequest(deps(db), {
+    authorId,
+    title: name,
+    description: "Details of the need.",
+  });
+  if (result.status !== "submitted")
+    throw new Error(`${name} was not submitted: ${result.status}`);
+  return result.problemId;
+}
+
+describe("findMatches", () => {
+  test("offers the 3 closest Problems, each at its best-matching request, with supporters", async () => {
+    const invoices = await submit("Invoices A");
+    expect(await submit("Invoices B", people.bob)).toBe(invoices);
+    const payroll = await submit("Payroll");
+    const receipts = await submit("Receipts");
+    await submit("Taxes");
+    await addSupport(deps(db), {
+      userId: people.priya,
+      problemId: payroll,
+      note: null,
+      source: "explore",
+    });
+
+    const matches = await findMatches(deps(db), {
+      viewerId: people.bob,
+      title: "Query",
+      description: "What I typed so far.",
+    });
+
+    expect(matches).toEqual([
+      {
+        id: invoices,
+        statement: "Statement for Invoices A",
+        supporters: 2,
+        supported: true,
+        similarity: expect.closeTo(0.647, 2),
+      },
+      {
+        id: payroll,
+        statement: "Statement for Payroll",
+        supporters: 2,
+        supported: false,
+        similarity: expect.closeTo(0.539, 2),
+      },
+      {
+        id: receipts,
+        statement: "Statement for Receipts",
+        supporters: 1,
+        supported: false,
+        similarity: expect.closeTo(0.431, 2),
+      },
+    ]);
+  });
+
+  test("finds nothing before any Problem exists", async () => {
+    expect(
+      await findMatches(deps(db), {
+        viewerId: people.bob,
+        title: "Query",
+        description: "What I typed so far.",
+      }),
+    ).toEqual([]);
+  });
+});
+
+describe("addSupport", () => {
+  test("adds one support per user, keeps its note as evidence, and records the deflection", async () => {
+    const problemId = await submit("Payroll");
+    const plusOne = (note: string | null) =>
+      addSupport(deps(db), {
+        userId: people.bob,
+        problemId,
+        note,
+        source: "submit",
+      });
+
+    expect(await plusOne("We run payroll for 40 people by hand.")).toBe(
+      "added",
+    );
+    expect(await plusOne("Second thoughts.")).toBe("already_supported");
+
+    expect(
+      await db
+        .select({ userId: supports.userId, note: supports.note })
+        .from(supports)
+        .where(eq(supports.problemId, problemId))
+        .orderBy(supports.userId),
+    ).toEqual([
+      { userId: people.alice, note: null },
+      { userId: people.bob, note: "We run payroll for 40 people by hand." },
+    ]);
+    expect(
+      await db
+        .select({ type: events.type, actorId: events.actorId })
+        .from(events)
+        .where(inArray(events.type, ["request_deflected", "support_added"])),
+    ).toEqual([{ type: "request_deflected", actorId: people.bob }]);
+  });
+
+  test("the author of a request already supports its Problem", async () => {
+    const problemId = await submit("Payroll");
+
+    expect(
+      await addSupport(deps(db), {
+        userId: people.alice,
+        problemId,
+        note: null,
+        source: "explore",
+      }),
+    ).toBe("already_supported");
+  });
+
+  test("a Problem that no longer exists cannot be supported", async () => {
+    expect(
+      await addSupport(deps(db), {
+        userId: people.bob,
+        problemId: 999_999,
+        note: null,
+        source: "explore",
+      }),
+    ).toBe("missing");
+  });
+});
+
+describe("listProblems", () => {
+  test("lists every Problem, most supported first, marking the viewer's", async () => {
+    const payroll = await submit("Payroll");
+    const receipts = await submit("Receipts");
+    await addSupport(deps(db), {
+      userId: people.bob,
+      problemId: receipts,
+      note: null,
+      source: "explore",
+    });
+
+    expect(await listProblems(deps(db), people.bob)).toEqual([
+      {
+        id: receipts,
+        statement: "Statement for Receipts",
+        supporters: 2,
+        supported: true,
+      },
+      {
+        id: payroll,
+        statement: "Statement for Payroll",
+        supporters: 1,
+        supported: false,
+      },
+    ]);
+  });
+});

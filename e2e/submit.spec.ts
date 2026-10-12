@@ -8,6 +8,7 @@ test("submitting a request creates a new problem listed in My requests", async (
   await page
     .getByLabel("What do you need, and why?")
     .fill("Our bank feed silently disconnects and we miss transactions.");
+  await page.getByRole("button", { name: "Next" }).click();
   await page.getByRole("button", { name: "Submit request" }).click();
 
   await expect(page.getByRole("status")).toContainText(
@@ -32,6 +33,7 @@ test("a request whose analysis fails is kept as a draft and can be submitted aga
   await page
     .getByLabel("What do you need, and why?")
     .fill("Our accountant needs the ledger in Excel every month.");
+  await page.getByRole("button", { name: "Next" }).click();
   await page.getByRole("button", { name: "Submit request" }).click();
 
   await expect(
@@ -56,6 +58,7 @@ test("a request that fails validation keeps what was typed", async ({
   await page.goto("/submit");
   await page.getByLabel("Title").fill("csv export");
   await page.getByLabel("What do you need, and why?").fill("too short");
+  await page.getByRole("button", { name: "Next" }).click();
   await page.getByRole("button", { name: "Submit request" }).click();
 
   await expect(

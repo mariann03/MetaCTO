@@ -331,3 +331,15 @@ Response: Merged PR #24 (closes #8), switched to main and pulled.
 [2026-10-12T16:00:00Z]
 Prompt: /mattpocock-skills:implement #10 (PM review queue: accept / move / split)
 Response: Added reviewed_at and a review module: queue of medium groupings (flagging signals that disagree), new Problems and disputed groupings with verdict, rationale and candidate similarities; accept (refines the statement for medium groupings), move and split (override events, support follows the request, emptied Problems deleted). /review page for PMs (oldest 25), service tests and E2E for accept, move and split.
+
+[2026-10-12T16:40:00Z]
+Prompt: merge it
+Response: Merged PR #25 (closes #10), switched to main and pulled.
+
+[2026-10-12T17:00:00Z]
+Prompt: take a closer look and check what we should do next
+Response: Listed open issues with their blockers; recommended #5 (first step of the longest chain #5 > #9 > #15 > #16 > #18, and it produces the deflection metric), then #12, #11 and #23.
+
+[2026-10-12T17:30:00Z]
+Prompt: /mattpocock-skills:implement #5 (live matching and deflection)
+Response: Added supports.note and a problems module: embedding-only matching grouped by Problem (top 3 with statement and supporters), +1 with optional note (one per user; request_deflected from submit, support_added from Explore), Problem list with supporter counts. Submit is two-step (Next) with live matches after a 500 ms pause from 30 chars; Explore lists Problems with +1. Service tests and a deflection E2E; existing E2E specs go through Next.

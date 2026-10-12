@@ -43,6 +43,13 @@
       "when": 1791817697642,
       "tag": "0005_review_queue",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791818649669,
+      "tag": "0006_support_note",
+      "breakpoints": true
     }
   ]
 }

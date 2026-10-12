@@ -28,7 +28,7 @@ Scores, decisions, briefs and notifications hang off the Problem.
 
 ## Intake flow
 
-1. **Live match** — after the user pauses typing (`matchDebounceMs`, default 500 ms) once text reaches `matchMinChars` (default 30), and always on "Next": embed title + description, vector-search the top 3 Problems, show "Is this what you're asking for?". One click adds support to an existing Problem instead of creating a Request (deflection).
+1. **Live match** — after the user pauses typing (`matchDebounceMs`, default 500 ms) once text reaches `matchMinChars` (default 30), and always on "Next": embed title + description, vector-search the top 3 Problems, show "Is this what you're asking for?". One click adds support to an existing Problem instead of creating a Request (deflection). Matching is embedding-only (no LLM call): request embeddings grouped by Problem at its best match, shown with statement and supporter count. "+1, this affects me" takes an optional note stored on the Support; a second +1 is a no-op. A +1 from the submit page is recorded as `request_deflected`, one from Explore as `support_added`.
 2. **Clarifying questions** — up to `maxClarifyingQuestions` (default 1; 0 disables; editable in UI for A/B) when the request states a solution but not the need. Skippable.
 3. **Post-submit analysis** — one structured LLM call: extract underlying problem, proposed solution, persona, severity, and a categorical verdict against the top-k candidates.
 4. **Tiering** (see Confidence) → high: auto-attach ("Grouped into X — not the same? Split it out"); medium: attach + PM review queue; low: create a new Problem.
