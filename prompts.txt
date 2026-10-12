@@ -296,3 +296,8 @@ Response: Review found 15 issues, fixed 8 (tier backfill in migration 0004, lock
 [2026-10-12T08:36:58Z]
 Prompt: Fix review findings 1-4 (split-out in My requests, similarity-only lock threshold, idempotent split request, log refinement failures).
 Response: Implemented test-first: My requests shows split-out on grouped undisputed rows and a split-requested note; lock re-check uses the low threshold in similarity-only mode; repeat split requests are a no-op; failed refinements record statement_refinement_failed. 58 unit + 5 E2E green; committed and pushed to PR #22.
+
+
+[2026-10-12T08:49:27Z]
+Prompt: yes, merge PR #22.
+Response: Merged PR #22 into main (closes #6); synced local main.
