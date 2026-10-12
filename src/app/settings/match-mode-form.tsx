@@ -11,12 +11,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { MatchMode } from "@/domain/intake";
+import { MATCH_MODES, type MatchMode } from "@/domain/settings";
 
-const MODES: { value: MatchMode; label: string }[] = [
-  { value: "hybrid", label: "Hybrid: similarity and AI verdict" },
-  { value: "similarity-only", label: "Similarity only" },
-];
+const LABELS: Record<MatchMode, string> = {
+  hybrid: "Hybrid: similarity and AI verdict",
+  "similarity-only": "Similarity only",
+};
+const MODES = MATCH_MODES.map((value) => ({ value, label: LABELS[value] }));
 const idle: MatchModeState = { status: "idle" };
 
 export function MatchModeForm({ mode }: { mode: MatchMode }) {

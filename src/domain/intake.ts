@@ -13,7 +13,7 @@ import {
 } from "drizzle-orm";
 import ms from "ms";
 import { z } from "zod";
-import type { Db } from "@/db/client";
+import type { Db, Tx } from "@/db/client";
 import {
   EMBEDDING_DIMENSIONS,
   events,
@@ -21,11 +21,10 @@ import {
   problems,
   problemVersions,
   requests,
-  settings,
   supports,
-  users,
 } from "@/db/schema";
 import type { DbDeps, Deps } from "./deps";
+import { getMatchMode, type MatchMode } from "./settings";
 
 export const SUBMISSIONS_PER_HOUR = 10;
 export const ANALYSIS_ATTEMPTS = 3;
@@ -53,12 +52,16 @@ const extractionSchema = z.object({
   severity: z.enum(["low", "medium", "high"]),
 });
 
-/** hybrid: embedding similarity plus the model's verdict; similarity-only: thresholds alone. */
-export type MatchMode = "hybrid" | "similarity-only";
 export type Tier = (typeof matchTier.enumValues)[number];
 
 // ponytail: provisional values from a manual bge-m3 check; the eval (#8) tunes them per embedding model.
-export const THRESHOLDS: Record<MatchMode, { low: number; high: number }> = {
+/** Similarity at or above `low` is worth a review; at or above `high` it may auto-group. */
+export interface Thresholds {
+  low: number;
+  high: number;
+}
+
+export const THRESHOLDS: Record<MatchMode, Thresholds> = {
   hybrid: { low: 0.5, high: 0.75 },
   "similarity-only": { low: 0.6, high: 0.85 },
 };
@@ -300,7 +303,7 @@ async function runSubmission(
     return { status: "draft", requestId: request.id };
   }
 
-  const { problemId, tier } = decide(result.analysis);
+  const { problemId, tier } = placeRequest(result.analysis);
   if (problemId === null)
     return createProblemFromRequest(deps, request, result);
 
@@ -316,11 +319,10 @@ async function runSubmission(
 }
 
 type Analyzed = Awaited<ReturnType<typeof analyze>>;
-type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
 type Submitted = Extract<SubmitResult, { status: "submitted" }>;
 
 /** The tier table: where a request goes, given its candidates and the model's verdict. */
-function decide({ candidates, match, mode }: RequestAnalysis): {
+function placeRequest({ candidates, match, mode }: RequestAnalysis): {
   tier: Tier;
   problemId: number | null;
 } {
@@ -335,13 +337,12 @@ function decide({ candidates, match, mode }: RequestAnalysis): {
       return { tier: "medium", problemId: best.problemId };
     return { tier: "low", problemId: null };
   }
-  if (match.verdict === "different")
-    // A confident embedding against the model's "different" is a disagreement: review it.
-    return best.similarity >= high
-      ? { tier: "medium", problemId: best.problemId }
-      : { tier: "low", problemId: null };
+  // The model's "different" always starts a Problem; new Problems reach the PM review anyway.
+  if (match.verdict === "different") return { tier: "low", problemId: null };
 
-  const named = candidates.find((c) => c.problemId === match.problemId) ?? best;
+  // analyze() guarantees the named Problem is one of the candidates.
+  const named = candidates.find((c) => c.problemId === match.problemId);
+  if (!named) throw new Error(`Problem ${match.problemId} is not a candidate`);
   return match.verdict === "same_problem" && named.similarity >= high
     ? { tier: "high", problemId: named.problemId }
     : { tier: "medium", problemId: named.problemId };
@@ -360,7 +361,13 @@ async function createProblemFromRequest(
       sql`select pg_advisory_xact_lock(hashtext('problem_creation'))`,
     );
     // A near-identical request may have created a Problem while this one was being analyzed.
-    const [meanwhile] = await findCandidates(tx, analyzed.embedding);
+    // Problems that were already candidates were judged by the model, so only new ones count.
+    const judged = new Set(
+      analyzed.analysis.candidates.map((c) => c.problemId),
+    );
+    const meanwhile = (await findCandidates(tx, analyzed.embedding)).find(
+      (c) => !judged.has(c.problemId),
+    );
     if (
       meanwhile &&
       meanwhile.similarity >= THRESHOLDS[analyzed.analysis.mode].high
@@ -486,6 +493,7 @@ async function refineStatement(
       prompt: `<current_statement>${escapeMarkup(problem.statement)}</current_statement>\n${requestMarkup(request)}`,
       output: Output.object({ schema: statementSchema }),
       reasoning: "none",
+      // Best effort outside the retried pipeline, so the SDK's own retries stay on.
       abortSignal: AbortSignal.timeout(ATTEMPT_TIMEOUT),
     });
     const statement = output.statement.trim();
@@ -550,43 +558,6 @@ export async function requestSplit(
   });
 }
 
-const MATCH_MODE_KEY = "matchMode";
-
-export async function getMatchMode({ db }: DbDeps): Promise<MatchMode> {
-  const [row] = await db
-    .select({ value: settings.value })
-    .from(settings)
-    .where(eq(settings.key, MATCH_MODE_KEY));
-  return row?.value === "similarity-only" ? "similarity-only" : "hybrid";
-}
-
-/** PMs switch between hybrid and similarity-only matching (e.g. to compare them). */
-export async function setMatchMode(
-  { db }: DbDeps,
-  { mode, userId }: { mode: MatchMode; userId: number },
-) {
-  const [user] = await db
-    .select({ role: users.role })
-    .from(users)
-    .where(eq(users.id, userId));
-  if (user?.role !== "pm")
-    throw new Error("Only a PM can change the matching mode");
-  await db.transaction(async (tx) => {
-    await tx
-      .insert(settings)
-      .values({ key: MATCH_MODE_KEY, value: mode })
-      .onConflictDoUpdate({ target: settings.key, set: { value: mode } });
-    await tx.insert(events).values({
-      type: "match_mode_changed",
-      actor: "pm",
-      actorId: userId,
-      entityType: "setting",
-      entityId: 0,
-      payload: { mode },
-    });
-  });
-}
-
 async function analyze(
   { db, models }: Deps,
   request: RequestText,
@@ -629,10 +600,13 @@ async function analyze(
     z.object({ match: matchSchema.nullish() }).parse(output).match ?? null;
   const extraction = extractionSchema.parse(output);
   // The model may only point at a Problem it was offered; anything else is a failed analysis.
+  const offered = (id: number | null) =>
+    candidates.some((c) => c.problemId === id);
   if (
     match &&
-    match.verdict !== "different" &&
-    !candidates.some((c) => c.problemId === match.problemId)
+    (match.verdict === "different"
+      ? match.problemId !== null && !offered(match.problemId)
+      : !offered(match.problemId))
   )
     throw new Error(
       `Verdict names Problem ${match.problemId}, not a candidate`,
@@ -656,8 +630,11 @@ async function candidatesMarkup(db: Db, candidates: Candidate[]) {
         candidates.map((c) => c.problemId),
       ),
     );
-  const items = rows.map(
-    (p) => `<candidate id="${p.id}">${escapeMarkup(p.statement)}</candidate>`,
+  const statements = new Map(rows.map((p) => [p.id, p.statement]));
+  // Most similar first, so the model reads candidates in ranking order.
+  const items = candidates.map(
+    (c) =>
+      `<candidate id="${c.problemId}">${escapeMarkup(statements.get(c.problemId) ?? "")}</candidate>`,
   );
   return `<candidates>\n${items.join("\n")}\n</candidates>`;
 }

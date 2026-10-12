@@ -1,5 +1,6 @@
 import { Suspense } from "react";
-import { getMatchMode, THRESHOLDS } from "@/domain/intake";
+import { THRESHOLDS } from "@/domain/intake";
+import { getMatchMode } from "@/domain/settings";
 import { deps } from "@/server/deps";
 import { getSession } from "@/server/session";
 import { MatchModeForm } from "./match-mode-form";

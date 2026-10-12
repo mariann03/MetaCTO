@@ -4,13 +4,12 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { z } from "zod";
 import {
-  type MatchMode,
   requestSplit,
   resubmitDraft,
   type SubmitResult,
-  setMatchMode,
   submitRequest,
 } from "@/domain/intake";
+import { MATCH_MODES, setMatchMode } from "@/domain/settings";
 import { deps } from "@/server/deps";
 import { getSession, USER_COOKIE } from "@/server/session";
 
@@ -83,7 +82,9 @@ export async function resubmitDraftAction(
   return result;
 }
 
-export type SplitState = { status: "idle" | "requested" };
+export interface SplitState {
+  status: "idle" | "requested";
+}
 
 export async function requestSplitAction(
   requestId: number,
@@ -97,7 +98,9 @@ export async function requestSplitAction(
   return { status: "requested" };
 }
 
-export type MatchModeState = { status: "idle" | "saved" | "forbidden" };
+export interface MatchModeState {
+  status: "idle" | "saved" | "forbidden";
+}
 
 export async function setMatchModeAction(
   _prev: MatchModeState,
@@ -105,9 +108,7 @@ export async function setMatchModeAction(
 ): Promise<MatchModeState> {
   const user = await currentUser();
   if (user.role !== "pm") return { status: "forbidden" };
-  const mode: MatchMode = z
-    .enum(["hybrid", "similarity-only"])
-    .parse(form.get("mode"));
+  const mode = z.enum(MATCH_MODES).parse(form.get("mode"));
   await setMatchMode(deps, { mode, userId: user.id });
   revalidatePath("/settings");
   return { status: "saved" };
