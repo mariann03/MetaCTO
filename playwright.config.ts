@@ -1,4 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
+import ms from "ms";
 
 export const E2E_DATABASE_URL =
   process.env.E2E_DATABASE_URL ??
@@ -14,7 +15,7 @@ export default defineConfig({
   webServer: {
     command: `bun run build && bun run start --port ${PORT}`,
     url: `http://localhost:${PORT}`,
-    timeout: 180_000,
+    timeout: ms("3m"),
     env: { DATABASE_URL: E2E_DATABASE_URL, E2E_FAKE_AI: "1" },
   },
 });
