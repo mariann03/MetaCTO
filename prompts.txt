@@ -246,3 +246,8 @@ Response: Replaced Playwright webServer timeout 180_000 with ms("3m"); scanned c
 [2026-10-12T07:00:11Z]
 Prompt: Push the ms change to the PR and merge the branch.
 Response: Committed and pushed ms change, merged PR #20 into main (merge commit), closing #2 and #3; synced local main.
+
+
+[2026-10-12T07:01:32Z]
+Prompt: /mattpocock-skills:implement #4 (submit request -> new Problem with draft fallback).
+Response: (in progress) Implementing #4 on branch feat/4-submit-request.
