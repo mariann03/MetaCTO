@@ -48,15 +48,7 @@ export async function seedDirectory(
       const [row] = await tx
         .insert(accounts)
         .values(a)
-        .onConflictDoUpdate({
-          target: accounts.key,
-          set: {
-            name: a.name,
-            segment: a.segment,
-            arr: a.arr,
-            churnRisk: a.churnRisk,
-          },
-        })
+        .onConflictDoUpdate({ target: accounts.key, set: a })
         .returning({ id: accounts.id });
       if (row) accountIds.set(a.key, row.id);
     }
@@ -91,19 +83,15 @@ export async function listUsers({ db }: DbDeps) {
       name: users.name,
       role: users.role,
       accountName: accounts.name,
-      accountSegment: accounts.segment,
     })
     .from(users)
     .leftJoin(accounts, eq(users.accountId, accounts.id))
     // Submitters first; within a role, customers before internal staff, then by name.
     .orderBy(asc(users.role), sql`${users.accountId} is null`, asc(users.name));
 
-  return rows.map(({ accountName, accountSegment, ...user }) => ({
+  return rows.map(({ accountName, ...user }) => ({
     ...user,
-    account:
-      accountName && accountSegment
-        ? { name: accountName, segment: accountSegment }
-        : null,
+    account: accountName ? { name: accountName } : null,
   }));
 }
 

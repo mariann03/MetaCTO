@@ -33,7 +33,6 @@ export async function resetDatabase(db: Db) {
   const { rows } = await db.execute<{ tablename: string }>(
     sql`select tablename from pg_tables where schemaname = 'public'`,
   );
-  if (rows.length === 0) return;
   const tables = rows.map((r) => `"${r.tablename}"`).join(", ");
   await db.execute(sql.raw(`truncate ${tables} restart identity cascade`));
 }

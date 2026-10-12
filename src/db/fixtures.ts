@@ -5,12 +5,9 @@ import {
   parseDirectoryFixtures,
 } from "@/domain/directory";
 
-export const FIXTURES_DIR = join(process.cwd(), "data", "fixtures");
-
-export async function loadDirectoryFixtures(
-  dir = FIXTURES_DIR,
-): Promise<DirectoryFixtures> {
-  const read = (file: string) => readFile(join(dir, file), "utf8");
+export async function loadDirectoryFixtures(): Promise<DirectoryFixtures> {
+  const read = (file: string) =>
+    readFile(join(process.cwd(), "data", "fixtures", file), "utf8");
   return parseDirectoryFixtures({
     accounts: JSON.parse(await read("accounts.json")),
     users: JSON.parse(await read("users.json")),

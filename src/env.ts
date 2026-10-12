@@ -2,11 +2,16 @@ import { z } from "zod";
 
 // `provider:model`, typed as a template literal so it feeds the registry without casts.
 // Providers are limited per tier so a wrong pairing fails here, not deep in the registry.
-const modelId = <const P extends readonly [string, ...string[]]>(
-  providers: P,
-) => z.templateLiteral([z.enum(providers), ":", z.string().min(1)]);
-const languageModelId = modelId(["ollama", "anthropic", "openai"]);
-const embeddingModelId = modelId(["ollama", "openai", "voyage"]);
+const languageModelId = z.templateLiteral([
+  z.enum(["ollama", "anthropic", "openai"]),
+  ":",
+  z.string().min(1),
+]);
+const embeddingModelId = z.templateLiteral([
+  z.enum(["ollama", "openai", "voyage"]),
+  ":",
+  z.string().min(1),
+]);
 
 const envSchema = z.object({
   DATABASE_URL: z.url(),

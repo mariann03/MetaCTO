@@ -226,3 +226,13 @@ Response: Recorded in docs/design.md (reasoning none for intake/clarify/statemen
 [2026-10-12T06:25:02Z]
 Prompt: Commit local-model changes on this same branch (PR #20).
 Response: Committed and pushed to feat/2-3-walking-skeleton-dataset (PR #20).
+
+
+[2026-10-12T06:53:47Z]
+Prompt: /ponytail:ponytail-review (over-engineering review of PR #20).
+Response: Listed complexity findings with net lines possible; no fixes applied.
+
+
+[2026-10-12T06:55:25Z]
+Prompt: Apply the ponytail-review fixes and push to the PR.
+Response: Applied 7 simplifications (directory set/account segment, fixtures dir, env model id consts, test/db guard, playwright defaults); checks green; committed and pushed to PR #20.
