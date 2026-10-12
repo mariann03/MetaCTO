@@ -24,6 +24,7 @@ async function Priorities() {
       </p>
     );
 
+  // ponytail: every open Problem goes to the browser (71 on the seed); page or cap it in the hundreds.
   const criteria = await listCriteria(deps);
   if (criteria.length === 0)
     return <p className="text-muted-foreground">No problems yet.</p>;

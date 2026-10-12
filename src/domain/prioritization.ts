@@ -1,4 +1,4 @@
-import { asc, count, eq, type SQL, sql } from "drizzle-orm";
+import { asc, count, eq, notInArray, type SQL, sql } from "drizzle-orm";
 import { accounts, problems, supports, users } from "@/db/schema";
 import type { DbDeps } from "./deps";
 
@@ -6,7 +6,7 @@ const total = (value: SQL.Aliased) =>
   sql<number>`coalesce(${value}, 0)`.mapWith(Number);
 
 /**
- * The data-driven criteria of every Problem, computed in SQL on each read so they are
+ * The data-driven criteria of every Problem still to decide, computed in SQL on each read so they are
  * always current: Reach (distinct supporters and accounts) and Business value (ARR,
  * segment mix, churn risk). ARR counts each account once, however many of its people
  * support the Problem.
@@ -71,6 +71,8 @@ export async function listCriteria({ db }: DbDeps) {
     .from(problems)
     .leftJoin(bySupporter, eq(bySupporter.problemId, problems.id))
     .leftJoin(byAccount, eq(byAccount.problemId, problems.id))
+    // Shipped and declined Problems are decided; planned ones still compete for order.
+    .where(notInArray(problems.status, ["shipped", "declined"]))
     .orderBy(asc(problems.id));
 
   return rows.map(({ smb, midMarket, enterprise, ...criteria }) => ({

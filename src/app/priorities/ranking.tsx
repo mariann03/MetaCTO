@@ -23,6 +23,7 @@ const SEGMENT: Record<keyof ProblemCriteria["segments"], string> = {
   enterprise: "Enterprise",
 };
 const MAX_WEIGHT = 10;
+const DEFAULT_WEIGHT = 5;
 
 const usd = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -35,10 +36,10 @@ const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`;
 /** Problems ranked by the PM's weights; moving a slider reorders them at once, in the browser. */
 export function Ranking({ criteria }: { criteria: ProblemCriteria[] }) {
   // ponytail: weights reset on reload; persist them in settings once PMs want a saved ranking.
-  const [weights, setWeights] = useState<Weights>({
-    reach: 5,
-    businessValue: 5,
-  });
+  const [weights, setWeights] = useState(
+    () =>
+      Object.fromEntries(CRITERIA.map((c) => [c, DEFAULT_WEIGHT])) as Weights,
+  );
   const ranked = rank(criteria, weights);
 
   return (

@@ -64,7 +64,7 @@ Rows are checked top to bottom. The creation lock re-checks only Problems create
 ## Prioritization
 
 - **Computed in SQL, always fresh:** Reach (distinct supporters/accounts), Business value (ARR, segment mix, churn flags).
-- **Scoring:** each criterion scores 0–1 against the top Problem on it. Reach weighs supporters and accounts equally; Business value is ARR (each account once) with at-risk ARR counted twice; segment mix is shown, not scored. The Priorities page ranks in the browser as the PM moves the 0–10 weight sliders (weights are not saved).
+- **Scoring:** each criterion scores 0–1 against the top Problem on it. Reach weighs supporters and accounts equally; Business value is ARR (each account once) with at-risk ARR counted twice; segment mix is shown, not scored. Shipped and declined Problems are left out. The Priorities page ranks in the browser as the PM moves the 0–10 weight sliders (weights are not saved).
 - **LLM-judged:** Strategic fit (vs the PM's strategy doc), Urgency/severity, Effort (labeled as a guess). Each score carries a rationale and citations to specific requests.
 - LLM scores are marked **stale** on new evidence or a strategy-doc change; PM rescores manually or via "Rescore all stale". No automatic bulk rescoring.
 - Final rank = PM-weighted sum computed in code. PM can override any score with a required reason; the override is logged and shown beside the AI score.

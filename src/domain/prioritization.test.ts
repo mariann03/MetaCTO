@@ -6,7 +6,9 @@ import {
   expect,
   test,
 } from "bun:test";
+import { inArray } from "drizzle-orm";
 import type { Db } from "@/db/client";
+import { problems } from "@/db/schema";
 import {
   prepareDatabase,
   resetDatabase,
@@ -133,6 +135,26 @@ describe("listCriteria", () => {
       churnRiskArr: 0,
       segments: { smb: 0, mid_market: 0, enterprise: 0 },
     });
+  });
+
+  test("leaves out Problems already decided: shipped or declined", async () => {
+    await db
+      .update(problems)
+      .set({ status: "shipped" })
+      .where(inArray(problems.id, [ids.sso]));
+    await db
+      .update(problems)
+      .set({ status: "declined" })
+      .where(inArray(problems.id, [ids.audit]));
+    await db
+      .update(problems)
+      .set({ status: "planned" })
+      .where(inArray(problems.id, [ids.payroll]));
+
+    expect((await listCriteria({ db })).map((c) => c.statement)).toEqual([
+      "Exports",
+      "Payroll",
+    ]);
   });
 
   test("is always current: a new supporter shows up on the next read", async () => {
