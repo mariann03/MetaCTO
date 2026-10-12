@@ -28,7 +28,7 @@ import {
   requestSplit,
   type SubmitResult,
   submitRequest,
-  THRESHOLDS,
+  thresholdsFor,
 } from "./intake";
 import { type MatchMode, setMatchMode } from "./settings";
 
@@ -110,8 +110,9 @@ async function submitPair(
   return { original, followUp };
 }
 
-const hybrid = THRESHOLDS.hybrid;
-const simOnly = THRESHOLDS["similarity-only"];
+const modes = thresholdsFor("test:test-embedding");
+const hybrid = modes.hybrid;
+const simOnly = modes["similarity-only"];
 const between = (t: { low: number; high: number }) => (t.low + t.high) / 2;
 
 describe("hybrid tiers (verdict × similarity)", () => {
@@ -213,6 +214,32 @@ describe("grouping", () => {
     expect(original).toMatchObject({
       status: "submitted",
       tier: "low",
+    });
+  });
+
+  test("a match without a named Problem goes to review against the closest candidate", async () => {
+    const { original } = await submitPair({});
+    if (original.status !== "submitted") throw new Error("not submitted");
+    const { models: vague } = scriptedModels({
+      embed: () => axisVector(0),
+      generate: async () =>
+        jsonResult({
+          ...extraction,
+          match: { verdict: "same_problem", problemId: null, rationale: "x" },
+        }),
+    });
+
+    const result = await submitRequest(deps(vague), {
+      authorId: people.bob,
+      title: "Invoices to sheets",
+      description: "Same as before, I think.",
+    });
+
+    // Similarity is 1, yet without a named Problem it is never auto-grouped.
+    expect(result).toMatchObject({
+      status: "submitted",
+      tier: "medium",
+      problemId: original.problemId,
     });
   });
 

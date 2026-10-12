@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { embeddingModelName } from "@/ai/models";
 import {
   Table,
   TableBody,
@@ -8,11 +9,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { THRESHOLDS } from "@/domain/intake";
-import { getMatchMode } from "@/domain/settings";
+import { thresholdsFor } from "@/domain/intake";
+import { getMatchMode, MATCH_MODES } from "@/domain/settings";
 import { deps } from "@/server/deps";
 import { getSession } from "@/server/session";
 import { MatchModeForm } from "./match-mode-form";
+
+const BASIS = {
+  tuned: "Tuned on enough evidence",
+  provisional: "Provisional: too little evidence to tune",
+  never: "Never: not precise enough to auto-group",
+} as const;
 
 export default function SettingsPage() {
   return (
@@ -35,28 +42,38 @@ async function MatchingSettings() {
     );
 
   const mode = await getMatchMode(deps);
+  const embeddingModel = embeddingModelName(deps.models.embedding);
+  const modes = thresholdsFor(embeddingModel);
   return (
     <div className="space-y-4">
       <MatchModeForm mode={mode} />
       <Table>
         <TableCaption>
-          Thresholds in use (set by the evaluation, read-only)
+          Thresholds in use for {embeddingModel} (set by the evaluation,
+          read-only)
         </TableCaption>
         <TableHeader>
           <TableRow>
             <TableHead>Mode</TableHead>
             <TableHead>Review from</TableHead>
             <TableHead>Auto-group from</TableHead>
+            <TableHead>Basis</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {Object.entries(THRESHOLDS).map(([name, t]) => (
-            <TableRow key={name}>
-              <TableCell>{name}</TableCell>
-              <TableCell>{t.low}</TableCell>
-              <TableCell>{t.high}</TableCell>
-            </TableRow>
-          ))}
+          {MATCH_MODES.map((name) => {
+            const t = modes[name];
+            return (
+              <TableRow key={name}>
+                <TableCell>{name}</TableCell>
+                <TableCell>
+                  {name === "hybrid" ? "AI verdict" : t.low}
+                </TableCell>
+                <TableCell>{t.high > 1 ? "never" : t.high}</TableCell>
+                <TableCell>{BASIS[t.basis]}</TableCell>
+              </TableRow>
+            );
+          })}
         </TableBody>
       </Table>
     </div>
