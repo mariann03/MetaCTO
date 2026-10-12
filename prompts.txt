@@ -1,0 +1,23 @@
+[2026-10-12T01:27:40Z]
+Prompt: Create a CLAUDE.md file in the project root with a "Project Rules > Prompt Logging" instruction (log every prompt to prompts.txt with ISO 8601 timestamp and a summary of the response).
+Response: Created CLAUDE.md with the prompt-logging rule and started prompts.txt with this first entry.
+
+
+[2026-10-12T01:34:53Z]
+Prompt: /ponytail (activate ponytail mode, default level full).
+Response: Activated ponytail mode at full level; no code changes.
+
+
+[2026-10-12T01:35:34Z]
+Prompt: /caveman (activate caveman terse-voice mode).
+Response: Activated caveman mode for the session; no code changes.
+
+
+[2026-10-12T01:36:39Z]
+Prompt: /mattpocock-skills:setup-matt-pocock-skills (scaffold per-repo config for engineering skills).
+Response: Explored repo (GitHub remote, triage installed, single-context). User chose GitHub tracker + default triage labels. Created docs/agents/{issue-tracker,triage-labels,domain}.md from seed templates and appended "## Agent skills" block to CLAUDE.md.
+
+
+[2026-10-12T01:38:11Z]
+Prompt: commit this
+Response: Committed CLAUDE.md, prompts.txt and docs/agents/* as the initial commit on master.
