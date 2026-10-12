@@ -244,7 +244,8 @@ export async function listMyRequests({ db }: DbDeps, userId: number) {
       >`case when ${isDraft} then 'draft' else ${requests.status} end`,
       createdAt: requests.createdAt,
       canSplit: sql<boolean>`${canSplit}`,
-      splitRequested: sql<boolean>`${requests.splitRequestedAt} is not null`,
+      // Disputed and still awaiting the PM's review.
+      splitRequested: sql<boolean>`${requests.splitRequestedAt} is not null and ${requests.reviewedAt} is null`,
       problemId: problems.id,
       statement: problems.statement,
     })
@@ -465,7 +466,7 @@ async function createProblemFromRequest(
   });
 }
 
-/** Inserts a Problem with its first statement version, written by intake; returns its id. */
+/** Inserts a Problem whose first version is a statement intake extracted (so AI-written); returns its id. */
 export async function insertProblem(tx: Tx, statement: string) {
   const [problem] = await tx
     .insert(problems)

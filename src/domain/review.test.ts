@@ -30,7 +30,7 @@ import {
 import { seedPeople } from "../../test/seed";
 import type { Deps } from "./deps";
 import { listMyRequests, requestSplit, submitRequest } from "./intake";
-import { listReviewQueue, reviewRequest } from "./review";
+import { listReviewQueue, type ReviewDecision, reviewRequest } from "./review";
 
 /** Unit vector at `similarity` to the first request (axis 0), leaning along its own `axis`. */
 function towardOriginal(similarity: number, axis: number): number[] {
@@ -279,6 +279,54 @@ describe("reviewRequest", () => {
     ]);
   });
 
+  test("a Problem left without requests is kept while others still support it", async () => {
+    const original = await submit("Original need");
+    const other = await submit("Other need", people.bob);
+    // A plain +1, not from a request.
+    await db
+      .insert(supports)
+      .values({ problemId: other.problemId, userId: people.alice });
+
+    await reviewRequest(deps(db), {
+      userId: people.priya,
+      requestId: other.requestId,
+      decision: { action: "move", problemId: original.problemId },
+    });
+
+    expect(await statementOf(other.problemId)).toBe("Statement for Other need");
+    expect(
+      await db
+        .select({ userId: supports.userId })
+        .from(supports)
+        .where(eq(supports.problemId, other.problemId)),
+    ).toEqual([{ userId: people.alice }]);
+  });
+
+  test("a decision that does not fit the item is refused and changes nothing", async () => {
+    const original = await submit("Original need");
+    const mid = await submit("Mid need", people.bob);
+    const decide = (requestId: number, decision: ReviewDecision) =>
+      reviewRequest(deps(db), { userId: people.priya, requestId, decision });
+
+    expect(
+      await decide(mid.requestId, {
+        action: "move",
+        problemId: original.problemId,
+      }),
+    ).toBe("invalid");
+    expect(
+      await decide(mid.requestId, { action: "move", problemId: 999_999 }),
+    ).toBe("invalid");
+    // A new Problem is already its own; there is nothing to split it from.
+    expect(await decide(original.requestId, { action: "split" })).toBe(
+      "invalid",
+    );
+    expect((await listReviewQueue(deps(db))).map((i) => i.title)).toEqual([
+      "Original need",
+      "Mid need",
+    ]);
+  });
+
   test("splitting starts a new Problem from the request, recorded as an override", async () => {
     const original = await submit("Original need");
     const mid = await submit("Mid need", people.bob);
@@ -339,5 +387,22 @@ describe("reviewRequest", () => {
     expect(await review(people.priya)).toBe("already_reviewed");
     const [mine] = await listMyRequests(deps(db), people.bob);
     expect(mine?.canSplit).toBe(false);
+  });
+
+  test("a reviewed dispute no longer reads as awaiting review", async () => {
+    await submit("Original need");
+    const mid = await submit("Mid need", people.bob);
+    await requestSplit(deps(db), {
+      userId: people.bob,
+      requestId: mid.requestId,
+    });
+    await reviewRequest(deps(db), {
+      userId: people.priya,
+      requestId: mid.requestId,
+      decision: { action: "accept" },
+    });
+
+    const [mine] = await listMyRequests(deps(db), people.bob);
+    expect(mine?.splitRequested).toBe(false);
   });
 });

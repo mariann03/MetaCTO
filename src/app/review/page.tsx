@@ -21,6 +21,7 @@ import type { Verdict } from "@/domain/intake";
 import {
   listProblems,
   listReviewQueue,
+  type ProblemOption,
   type ReviewItem,
   type ReviewReason,
 } from "@/domain/review";
@@ -93,7 +94,7 @@ function QueueItem({
   problems,
 }: {
   item: ReviewItem;
-  problems: { id: number; statement: string }[];
+  problems: ProblemOption[];
 }) {
   const { match } = item;
   return (
