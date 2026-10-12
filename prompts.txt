@@ -351,3 +351,11 @@ Response: Merged PR #26 (#5 live matching and deflection) with a merge commit; #
 [2026-10-12T19:30:00Z]
 Prompt: /mattpocock-skills:implement #12 (prioritization: SQL criteria and weighted ranking)
 Response: Added listCriteria (Reach: distinct supporters and accounts; Business value: ARR once per account, at-risk ARR, segment mix) computed in SQL on read, and a pure rank() that scores each criterion 0-1 against the top Problem and orders by the weighted average. PM-only Priorities page with weight sliders ranks in the browser. Service tests on a known dataset and an E2E for the sliders.
+
+[2026-10-12T20:00:00Z]
+Prompt: /ponytail:ponytail-review
+Response: Listed cuts for the #12 diff: replace the curried SCORERS factory in rank() with maxima computed once and an object literal, delete the unused RankedProblem type, plain useState for weights, loop the status updates in the test (about -22 lines). Not applied.
+
+[2026-10-12T20:10:00Z]
+Prompt: maybe we should move plural to a helpers or utils file
+Response: Moved plural() to src/lib/utils.ts and used it in the Priorities table and in ProblemItem, which built the same "N supporter(s)" label by hand. Lint, typecheck and E2E pass.

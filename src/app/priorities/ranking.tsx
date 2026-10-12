@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/table";
 import type { ProblemCriteria } from "@/domain/prioritization";
 import { CRITERIA, type Criterion, rank, type Weights } from "@/domain/ranking";
+import { plural } from "@/lib/utils";
 
 const NAME: Record<Criterion, string> = {
   reach: "Reach",
@@ -31,7 +32,6 @@ const usd = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 0,
 });
 const points = (score: number) => Math.round(score * 100);
-const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`;
 
 /** Problems ranked by the PM's weights; moving a slider reorders them at once, in the browser. */
 export function Ranking({ criteria }: { criteria: ProblemCriteria[] }) {
