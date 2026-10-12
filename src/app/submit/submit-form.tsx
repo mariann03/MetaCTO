@@ -1,24 +1,59 @@
 "use client";
 
-import { useActionState, useRef, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import {
   findMatchesAction,
   type Match,
   type SubmitState,
   submitRequestAction,
 } from "@/app/actions";
+import { ProblemItem } from "@/components/problem-item";
 import { SubmitResultMessage } from "@/components/submit-result";
-import { SupportButton } from "@/components/support-button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { supportersLabel } from "@/lib/utils";
 
 const idle: SubmitState = { status: "idle" };
-// Live matching starts once title + description are this long, after a typing pause.
+// Live matching waits for enough text to match on and for a pause, so it does not embed every keystroke.
 const MATCH_MIN_CHARS = 30;
 const MATCH_DEBOUNCE_MS = 500;
+
+/**
+ * Two steps: write (matching Problems appear as you type), then Next shows the matches
+ * and the submit button. A +1 on a match supports it instead of filing a duplicate.
+ */
+export function SubmitForm() {
+  const [state, action, pending] = useActionState(submitRequestAction, idle);
+  const [deflectedTo, setDeflectedTo] = useState<string | null>(null);
+
+  if (deflectedTo)
+    return (
+      <div className="space-y-3">
+        <p role="status" className="rounded-md border bg-muted p-3 text-sm">
+          Your support was added to: <strong>{deflectedTo}</strong>. No need to
+          submit a request.
+        </p>
+        <Button variant="outline" onClick={() => setDeflectedTo(null)}>
+          Write a different request
+        </Button>
+      </div>
+    );
+
+  return (
+    <div className="space-y-4">
+      {/* A finished submission starts a new round: its matches, step and timers reset. */}
+      <RequestForm
+        key={"requestId" in state ? state.requestId : "open"}
+        state={state}
+        action={action}
+        pending={pending}
+        onDeflected={setDeflectedTo}
+      />
+      <SubmitResultMessage state={state} />
+    </div>
+  );
+}
 
 function formText(form: HTMLFormElement) {
   const data = new FormData(form);
@@ -28,26 +63,45 @@ function formText(form: HTMLFormElement) {
   };
 }
 
-/**
- * Two steps: write (matching Problems appear as you type), then Next shows the matches
- * and the submit button. A +1 on a match supports it instead of filing a duplicate.
- */
-export function SubmitForm() {
-  const [state, action, pending] = useActionState(submitRequestAction, idle);
+function RequestForm({
+  state,
+  action,
+  pending,
+  onDeflected,
+}: {
+  state: SubmitState;
+  action: (form: FormData) => void;
+  pending: boolean;
+  onDeflected: (statement: string) => void;
+}) {
   const errors = state.status === "invalid" ? state.errors : {};
+  // A refused submission keeps its text, so it stays on the confirm step.
+  const [step, setStep] = useState<"write" | "confirm">(
+    state.status === "invalid" || state.status === "rate_limited"
+      ? "confirm"
+      : "write",
+  );
   const [matches, setMatches] = useState<Match[] | null>(null);
-  // The state Next was pressed in; a new result (a submitted request) starts over.
-  const [nextIn, setNextIn] = useState<SubmitState | null>(null);
-  const reviewing =
-    nextIn === state ||
-    state.status === "invalid" ||
-    state.status === "rate_limited";
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  // Bumped to discard lookups still in flight: only the latest may show its matches.
   const latest = useRef(0);
 
-  async function match(form: HTMLFormElement) {
+  function cancelLookups() {
     clearTimeout(timer.current);
-    const call = ++latest.current;
+    latest.current++;
+  }
+  // Leaving the page must not leave a lookup (an embedding call) to fire.
+  useEffect(
+    () => () => {
+      clearTimeout(timer.current);
+      latest.current++;
+    },
+    [],
+  );
+
+  async function match(form: HTMLFormElement) {
+    cancelLookups();
+    const call = latest.current;
     const { title, description } = formText(form);
     // Matching is a hint: when it fails, the user can still submit.
     const found = await findMatchesAction(title, description).catch(() => []);
@@ -55,18 +109,18 @@ export function SubmitForm() {
   }
 
   return (
-    <div className="space-y-4">
+    <>
       <form
         action={action}
         className="space-y-4"
         onChange={(e) => {
           const form = e.currentTarget;
           const { title, description } = formText(form);
-          clearTimeout(timer.current);
+          cancelLookups();
           if (`${title}${description}`.trim().length >= MATCH_MIN_CHARS)
             timer.current = setTimeout(() => match(form), MATCH_DEBOUNCE_MS);
+          else setMatches(null);
         }}
-        onReset={() => setMatches(null)}
       >
         <div className="space-y-2">
           <Label htmlFor="title">Title</Label>
@@ -98,7 +152,7 @@ export function SubmitForm() {
           )}
         </div>
         {/* Keyed apart: reusing the Next button as the submit button would submit on Next. */}
-        {reviewing ? (
+        {step === "confirm" ? (
           <Button key="submit" type="submit" disabled={pending}>
             {pending ? "Analyzing…" : "Submit request"}
           </Button>
@@ -109,35 +163,29 @@ export function SubmitForm() {
             onClick={(e) => {
               const { form } = e.currentTarget;
               if (form) void match(form);
-              setNextIn(state);
+              setStep("confirm");
             }}
           >
             Next
           </Button>
         )}
       </form>
-      {/* Outside the form: each match and the result hold forms of their own. */}
+      {/* Outside the form: each match holds a form of its own. */}
       {matches && matches.length > 0 && (
         <section aria-label="Similar problems" className="space-y-2">
           <h2 className="font-medium">Is this what you're asking for?</h2>
           <ul className="divide-y rounded-md border">
             {matches.map((m) => (
-              <li key={m.id} aria-label={m.statement} className="space-y-2 p-3">
-                <p>{m.statement}</p>
-                <p className="text-muted-foreground text-sm">
-                  {supportersLabel(m.supporters)}
-                </p>
-                <SupportButton
-                  problemId={m.id}
-                  source="submit"
-                  supported={m.supported}
-                />
-              </li>
+              <ProblemItem
+                key={m.id}
+                problem={m}
+                source="submit"
+                onSupported={() => onDeflected(m.statement)}
+              />
             ))}
           </ul>
         </section>
       )}
-      <SubmitResultMessage state={state} />
-    </div>
+    </>
   );
 }

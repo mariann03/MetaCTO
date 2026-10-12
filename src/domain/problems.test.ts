@@ -42,9 +42,8 @@ const title = (prompt: unknown) =>
   /<title>(.*?)<\/title>/.exec(JSON.stringify(prompt))?.[1] ?? "";
 
 /** "Invoices" requests are judged the same need; everything else starts its own Problem. */
-const deps = (db: Db): Deps => ({
-  db,
-  models: scriptedModels({
+const scripted = () =>
+  scriptedModels({
     embed: (text) => VECTORS[text.split("\n")[0] ?? ""] ?? vector(0, 1),
     generate: async ({ prompt }) => {
       const name = title(prompt);
@@ -65,8 +64,8 @@ const deps = (db: Db): Deps => ({
               : { verdict: "different", problemId: null, rationale: "New" },
       });
     },
-  }).models,
-});
+  });
+const deps = (db: Db): Deps => ({ db, models: scripted().models });
 
 let db: Db;
 let people: Awaited<ReturnType<typeof seedPeople>>;
@@ -107,11 +106,18 @@ describe("findMatches", () => {
       source: "explore",
     });
 
-    const matches = await findMatches(deps(db), {
-      viewerId: people.bob,
-      title: "Query",
-      description: "What I typed so far.",
-    });
+    const { models, language } = scripted();
+    const matches = await findMatches(
+      { db, models },
+      {
+        viewerId: people.bob,
+        title: "Query",
+        description: "What I typed so far.",
+      },
+    );
+
+    // Embedding only: it runs while the user types, so no LLM call.
+    expect(language.doGenerateCalls).toHaveLength(0);
 
     expect(matches).toEqual([
       {

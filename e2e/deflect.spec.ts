@@ -24,7 +24,15 @@ test("a submitter supports a matching problem instead of filing a duplicate", as
     .getByLabel("How does this affect you? (optional)")
     .fill("Same here, two days a month.");
   await match.getByRole("button", { name: "Add my support" }).click();
-  await expect(match).toContainText("Thanks, your support was added.");
+  // Supported instead of filed: the request form gives way, and nothing was submitted.
+  await expect(page.getByRole("status")).toContainText(
+    `Your support was added to: ${statement}`,
+  );
+  await expect(page.getByLabel("Title")).toHaveCount(0);
+  await page.goto("/my-requests");
+  await expect(
+    page.getByText("You haven't submitted any requests yet."),
+  ).toBeVisible();
 
   await page.goto("/");
   await expect(page.getByRole("listitem", { name: statement })).toContainText(

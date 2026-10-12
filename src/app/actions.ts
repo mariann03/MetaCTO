@@ -9,7 +9,12 @@ import {
   type SubmitResult,
   submitRequest,
 } from "@/domain/intake";
-import { addSupport, findMatches, type SupportSource } from "@/domain/problems";
+import {
+  addSupport,
+  findMatches,
+  SUPPORT_SOURCES,
+  type SupportSource,
+} from "@/domain/problems";
 import { reviewRequest } from "@/domain/review";
 import { MATCH_MODES, setMatchMode } from "@/domain/settings";
 import { deps } from "@/server/deps";
@@ -167,7 +172,7 @@ export async function findMatchesAction(
 }
 
 export interface SupportState {
-  status: "idle" | Awaited<ReturnType<typeof addSupport>>;
+  status: "idle" | "invalid" | Awaited<ReturnType<typeof addSupport>>;
 }
 
 export async function addSupportAction(
@@ -179,14 +184,15 @@ export async function addSupportAction(
   const user = await currentUser();
   const note = z
     .string()
+    .trim()
     .max(1000)
-    .parse(String(form.get("note") ?? ""))
-    .trim();
+    .safeParse(String(form.get("note") ?? ""));
+  if (!note.success) return { status: "invalid" };
   const status = await addSupport(deps, {
     userId: user.id,
     problemId: z.number().int().positive().parse(problemId),
-    note: note === "" ? null : note,
-    source: z.enum(["submit", "explore"]).parse(source),
+    note: note.data === "" ? null : note.data,
+    source: z.enum(SUPPORT_SOURCES).parse(source),
   });
   revalidatePath("/");
   return { status };

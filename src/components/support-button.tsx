@@ -10,19 +10,28 @@ import type { SupportSource } from "@/domain/problems";
 const idle: SupportState = { status: "idle" };
 
 /** "+1, this affects me", then an optional note on how, kept as evidence. */
+export interface SupportButtonProps {
+  problemId: number;
+  source: SupportSource;
+  supported: boolean;
+  /** Called once the support is stored, e.g. so the submit page can drop its request. */
+  onAdded?: () => void;
+}
+
 export function SupportButton({
   problemId,
   source,
   supported,
-}: {
-  problemId: number;
-  source: SupportSource;
-  supported: boolean;
-}) {
+  onAdded,
+}: SupportButtonProps) {
   const noteId = useId();
   const [open, setOpen] = useState(false);
   const [state, action, pending] = useActionState(
-    addSupportAction.bind(null, problemId, source),
+    async (prev: SupportState, form: FormData) => {
+      const next = await addSupportAction(problemId, source, prev, form);
+      if (next.status === "added") onAdded?.();
+      return next;
+    },
     idle,
   );
 
@@ -55,6 +64,11 @@ export function SupportButton({
       <Button type="submit" size="sm" disabled={pending}>
         Add my support
       </Button>
+      {state.status === "invalid" && (
+        <p role="alert" className="text-destructive text-sm">
+          Keep the note under 1,000 characters.
+        </p>
+      )}
     </form>
   );
 }

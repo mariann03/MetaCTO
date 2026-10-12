@@ -66,7 +66,8 @@ export async function findMatches(
 }
 
 /** Where a +1 came from: the submit page (instead of filing a request), or Explore. */
-export type SupportSource = "submit" | "explore";
+export const SUPPORT_SOURCES = ["submit", "explore"] as const;
+export type SupportSource = (typeof SUPPORT_SOURCES)[number];
 
 /**
  * "+1, this affects me": the user supports the Problem, with an optional note kept as
