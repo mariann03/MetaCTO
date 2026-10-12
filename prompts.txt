@@ -276,3 +276,8 @@ Response: Merged PR #21 into main (closes #4), synced local main, listed unblock
 [2026-10-12T07:41:14Z]
 Prompt: /mattpocock-skills:implement #6 (confidence tiers and auto-grouping).
 Response: Implemented #6 (TDD): verdict (same/related/different + rationale) in the intake call with candidate statements; tier table per mode with provisional thresholds; candidate-only ids enforced; advisory-locked creation re-checking only Problems created meanwhile; high-tier attaches refine the statement (skipped when locked, versioned); split-out request; matchMode setting (PM only) on a Settings page; grouped result with split button. Two-axis review: reverted different+high-sim judgement call to spec, rejected non-candidate ids for any verdict, added boundary/row tests, moved settings into domain/settings.ts, MATCH_MODES const. Verified with real local models. 54 unit + 5 E2E green.
+
+
+[2026-10-12T08:17:53Z]
+Prompt: Yes to both: add the medium-tier statement refinement to #10 and push/open the PR for #6.
+Response: Added acceptance criterion to #10 (accepting a medium grouping refines the statement); pushed feat/6-confidence-tiers and opened PR closing #6.
