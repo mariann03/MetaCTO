@@ -3,12 +3,19 @@ import type { Models } from "@/ai/models";
 import {
   ANALYSIS_ATTEMPTS,
   analyzeRequest,
+  CANDIDATE_COUNT,
   embeddingText,
   PROVISIONAL_THRESHOLDS,
   placeRequest,
+  type ThresholdBasis,
   type Thresholds,
   type Tier,
+  type Verdict,
 } from "./intake";
+
+/** Which labeled split a fixture request belongs to: tuning uses train, reporting both. */
+export type Split = "train" | "holdout";
+
 import type { MatchMode } from "./settings";
 
 /**
@@ -18,7 +25,7 @@ import type { MatchMode } from "./settings";
  */
 export interface Observation {
   key: string;
-  split: "train" | "holdout";
+  split: Split;
   /** The cluster this request truly belongs to. */
   truth: string;
   /** Whether that cluster already existed, i.e. the request should have been grouped. */
@@ -27,7 +34,7 @@ export interface Observation {
   candidates: { cluster: string; similarity: number }[];
   /** The model's verdict in hybrid mode; null when it was not asked (no candidates). */
   verdict: {
-    verdict: "same_problem" | "related_but_different" | "different";
+    verdict: Verdict;
     cluster: string | null;
   } | null;
 }
@@ -51,6 +58,8 @@ export interface Metrics {
   highRecall: number | null;
   /** Share of attachable requests grouped correctly at high or medium. */
   attachRecall: number | null;
+  /** Share of truly new requests that started a new Problem (low tier). */
+  newRecall: number | null;
 }
 
 /** Where intake would place each observation at these thresholds, and whether that was right. */
@@ -105,15 +114,17 @@ export function score(
   };
   const high = stats("high");
   const medium = stats("medium");
+  const low = stats("low");
   const attachable = placed.filter((d) => d.attachable).length;
   return {
     requests: placed.length,
     attachable,
     high,
     medium,
-    low: stats("low"),
+    low,
     highRecall: ratio(high.correct, attachable),
     attachRecall: ratio(high.correct + medium.correct, attachable),
+    newRecall: ratio(low.correct, placed.length - attachable),
   };
 }
 
@@ -162,22 +173,34 @@ export function confidentPrecision(correct: number, count: number) {
  * observed at it is below target, in which case nothing auto-groups.
  * low (similarity-only; hybrid reviews by verdict): where grouping at high or medium has the best F1.
  */
-export function tune(observations: Observation[], mode: MatchMode): Thresholds {
+export function tune(
+  observations: Observation[],
+  mode: MatchMode,
+): Thresholds & { basis: ThresholdBasis } {
   const train = observations.filter((o) => o.split === "train");
   const highAt = (h: number) => score(train, mode, { low: h, high: h }).high;
   const provisional = PROVISIONAL_THRESHOLDS[mode].high;
   const observedAtProvisional = highAt(provisional).precision;
-  const high =
-    GRID.find((h) => {
-      const { correct, count } = highAt(h);
-      return confidentPrecision(correct, count) >= HIGH_TIER_PRECISION_TARGET;
-    }) ??
-    (observedAtProvisional === null ||
-    observedAtProvisional >= HIGH_TIER_PRECISION_TARGET
-      ? provisional
-      : NEVER);
+  const confident = GRID.find((h) => {
+    const { correct, count } = highAt(h);
+    return confidentPrecision(correct, count) >= HIGH_TIER_PRECISION_TARGET;
+  });
+  const provisionalHolds =
+    observedAtProvisional === null ||
+    observedAtProvisional >= HIGH_TIER_PRECISION_TARGET;
+  const { high, basis } =
+    confident !== undefined
+      ? { high: confident, basis: "tuned" as const }
+      : provisionalHolds
+        ? { high: provisional, basis: "provisional" as const }
+        : { high: NEVER, basis: "never" as const };
+  // Hybrid sends uncertain cases to review by verdict, so its low threshold is not used.
   if (mode === "hybrid")
-    return { low: Math.min(high, PROVISIONAL_THRESHOLDS.hybrid.low), high };
+    return {
+      low: Math.min(high, PROVISIONAL_THRESHOLDS.hybrid.low),
+      high,
+      basis,
+    };
 
   let best = { low: high, f1: -1 };
   for (const low of GRID.filter((l) => l <= high)) {
@@ -192,7 +215,7 @@ export function tune(observations: Observation[], mode: MatchMode): Thresholds {
     // >= keeps the highest low among ties: fewer reviews for the same accuracy.
     if (f1 >= best.f1) best = { low, f1 };
   }
-  return { low: best.low, high };
+  return { low: best.low, high, basis };
 }
 
 /** A labeled fixture request, in submission order. */
@@ -200,12 +223,10 @@ export interface EvalRequest {
   key: string;
   /** Ground truth: the problem it belongs to, or null for a one-off. */
   problemKey: string | null;
-  split: "train" | "holdout";
+  split: Split;
   title: string;
   description: string;
 }
-
-const CANDIDATE_COUNT = 3;
 
 /**
  * Replays each request through the real intake call against the ground-truth state:

@@ -301,3 +301,13 @@ Response: Implemented test-first: My requests shows split-out on grouped undispu
 [2026-10-12T08:49:27Z]
 Prompt: yes, merge PR #22.
 Response: Merged PR #22 into main (closes #6); synced local main.
+
+
+[2026-10-12T08:50:21Z]
+Prompt: /mattpocock-skills:implement #8 (seed through pipeline, eval, threshold tuning).
+Response: Implemented #8 (TDD): AI SDK cache middleware with committed data/cache (seed + eval replay offline, verified with Ollama unreachable); seed runs every fixture request through submitRequest; eval replays against the ground-truth state, scores tiers with placeRequest, tunes thresholds on train with a Wilson confidence guard (basis tuned/provisional/never), reports precision per tier, grouped/new/retrieval recall on train and holdout; thresholds keyed by embedding model, shown on Settings; reembed command. Eval found 22 verdicts without a Problem id -> now medium review against the closest candidate. Results: retrieval recall@3 76%, grouping precise but recall ~30-40% (follow-up #23). Two-axis review fixes applied. 77 unit + 5 E2E green.
+
+
+[2026-10-12T10:25:44Z]
+Prompt: Eval decisions: add a confidence guard to threshold tuning; open a follow-up issue for recall experiments.
+Response: Added Wilson lower-bound guard (falls back to provisional when evidence is thin, never if contradicted); re-ran eval from cache (hybrid 0.75 provisional, sim-only 0.58/0.85); opened #23 (recall experiments, blocked by #8); re-seeding.

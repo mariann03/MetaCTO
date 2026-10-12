@@ -110,7 +110,7 @@ async function submitPair(
   return { original, followUp };
 }
 
-const { modes } = thresholdsFor("test:test-embedding");
+const modes = thresholdsFor("test:test-embedding");
 const hybrid = modes.hybrid;
 const simOnly = modes["similarity-only"];
 const between = (t: { low: number; high: number }) => (t.low + t.high) / 2;

@@ -1,8 +1,9 @@
 import { embedMany } from "ai";
 import { eq, inArray, isNotNull } from "drizzle-orm";
+import { embeddingModelName } from "@/ai/models";
 import { requests, users } from "@/db/schema";
 import type { Deps } from "./deps";
-import { embeddingText, modelName, submitRequest } from "./intake";
+import { embeddingText, submitRequest } from "./intake";
 
 /** A fixture request: who sends it and what it says. */
 export interface SeedRequest {
@@ -66,7 +67,7 @@ export async function reembedRequests({ db, models }: Deps) {
     model: models.embedding,
     values: rows.map(embeddingText),
   });
-  const embeddingModel = modelName(models.embedding);
+  const embeddingModel = embeddingModelName(models.embedding);
   await db.transaction(async (tx) => {
     for (const [i, row] of rows.entries())
       await tx

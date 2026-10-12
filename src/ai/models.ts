@@ -22,6 +22,13 @@ export interface Models {
   embedding: EmbeddingModel;
 }
 
+/** `provider:model` name of an embedding model, as stored with each vector. */
+export function embeddingModelName(model: EmbeddingModel) {
+  return typeof model === "string"
+    ? model
+    : `${model.provider}:${model.modelId}`;
+}
+
 export function createModels(
   config: Pick<
     Env,

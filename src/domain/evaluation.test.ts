@@ -56,6 +56,8 @@ describe("score", () => {
     expect(m.attachable).toBe(4);
     expect(m.highRecall).toBe(0.25);
     expect(m.attachRecall).toBe(0.5);
+    // Of the requests that were truly new, the share that started a new Problem.
+    expect(m.newRecall).toBe(1);
   });
 
   test("hybrid follows the model's verdict", () => {
@@ -101,7 +103,9 @@ describe("tune", () => {
     ];
 
     // 80/80 at 0.81+ is confidently precise; adding the miss at 0.80 is not.
-    expect(tune(observations, "hybrid").high).toBeCloseTo(0.81, 5);
+    const tuned = tune(observations, "hybrid");
+    expect(tuned.high).toBeCloseTo(0.81, 5);
+    expect(tuned.basis).toBe("tuned");
   });
 
   test("with too few cases to be confident, keeps the provisional threshold", () => {
@@ -111,9 +115,10 @@ describe("tune", () => {
       obs("c", { cluster: "c", similarity: 0.4 }, "same_problem"),
     ];
 
-    expect(tune(observations, "hybrid").high).toBe(
-      PROVISIONAL_THRESHOLDS.hybrid.high,
-    );
+    expect(tune(observations, "hybrid")).toMatchObject({
+      high: PROVISIONAL_THRESHOLDS.hybrid.high,
+      basis: "provisional",
+    });
   });
 
   test("never auto-groups when no threshold is precise enough", () => {
@@ -121,7 +126,9 @@ describe("tune", () => {
       obs("a", { cluster: "x", similarity: 0.99 }, "same_problem"),
     ];
 
-    expect(tune(observations, "hybrid").high).toBeGreaterThan(1);
+    const tuned = tune(observations, "hybrid");
+    expect(tuned.high).toBeGreaterThan(1);
+    expect(tuned.basis).toBe("never");
   });
 
   test("in similarity-only mode, sets the review threshold where grouping is most accurate", () => {

@@ -1,5 +1,5 @@
 {
-  "runAt": "2026-10-12T11:11:09.965Z",
+  "runAt": "2026-10-12T11:15:04.659Z",
   "embeddingModel": "ollama:bge-m3",
   "intakeModel": "ollama:gemma4:12b",
   "requests": 150,
@@ -9,7 +9,8 @@
     "hybrid": {
       "thresholds": {
         "low": 0.5,
-        "high": 0.75
+        "high": 0.75,
+        "basis": "provisional"
       },
       "train": {
         "requests": 100,
@@ -30,7 +31,8 @@
           "precision": 0.25862068965517243
         },
         "highRecall": 0,
-        "attachRecall": 0.3291139240506329
+        "attachRecall": 0.3291139240506329,
+        "newRecall": 0.7142857142857143
       },
       "holdout": {
         "requests": 50,
@@ -51,13 +53,15 @@
           "precision": 0.125
         },
         "highRecall": 0.022222222222222223,
-        "attachRecall": 0.28888888888888886
+        "attachRecall": 0.28888888888888886,
+        "newRecall": 0.8
       }
     },
     "similarity-only": {
       "thresholds": {
         "low": 0.58,
-        "high": 0.85
+        "high": 0.85,
+        "basis": "provisional"
       },
       "train": {
         "requests": 100,
@@ -78,7 +82,8 @@
           "precision": 0.5833333333333334
         },
         "highRecall": 0,
-        "attachRecall": 0.3924050632911392
+        "attachRecall": 0.3924050632911392,
+        "newRecall": 0.6666666666666666
       },
       "holdout": {
         "requests": 50,
@@ -99,7 +104,8 @@
           "precision": 0.2222222222222222
         },
         "highRecall": 0,
-        "attachRecall": 0.4
+        "attachRecall": 0.4,
+        "newRecall": 0.4
       }
     }
   }

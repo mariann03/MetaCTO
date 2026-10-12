@@ -1,4 +1,4 @@
-import { type EmbeddingModel, embed, generateText, Output } from "ai";
+import { embed, generateText, Output } from "ai";
 import {
   and,
   asc,
@@ -15,7 +15,7 @@ import {
 } from "drizzle-orm";
 import ms from "ms";
 import { z } from "zod";
-import type { Models } from "@/ai/models";
+import { embeddingModelName, type Models } from "@/ai/models";
 import type { Db, Tx } from "@/db/client";
 import {
   EMBEDDING_DIMENSIONS,
@@ -34,7 +34,8 @@ export const SUBMISSIONS_PER_HOUR = 10;
 export const ANALYSIS_ATTEMPTS = 3;
 // Bounds one attempt, so a hung model call fails over to the next attempt or the draft.
 const ATTEMPT_TIMEOUT = ms("1m");
-const CANDIDATE_COUNT = 3;
+/** Problems offered to the model per request. */
+export const CANDIDATE_COUNT = 3;
 // Requests fetched before grouping by Problem; enough to fill CANDIDATE_COUNT Problems.
 const CANDIDATE_REQUEST_POOL = 20;
 
@@ -70,29 +71,50 @@ export const PROVISIONAL_THRESHOLDS: Record<MatchMode, Thresholds> = {
   "similarity-only": { low: 0.6, high: 0.85 },
 };
 
-const thresholdsSchema = z.object({ low: z.number(), high: z.number() });
+/** How a high threshold was set: tuned on enough evidence, kept provisional, or never auto-group. */
+export const THRESHOLD_BASES = ["tuned", "provisional", "never"] as const;
+export type ThresholdBasis = (typeof THRESHOLD_BASES)[number];
+
+const thresholdsSchema = z.object({
+  low: z.number(),
+  high: z.number(),
+  basis: z.enum(THRESHOLD_BASES),
+});
+/** The file `bun run eval` writes: thresholds per mode, keyed by embedding model. */
+export const tunedThresholdsSchema = z.record(
+  z.string(),
+  z.object({ hybrid: thresholdsSchema, "similarity-only": thresholdsSchema }),
+);
+export type TunedThresholds = z.infer<typeof tunedThresholdsSchema>;
 // Written by `bun run eval`; keyed by embedding model, because similarity scales differ per model.
-const tuned = z
-  .record(
-    z.string(),
-    z.object({ hybrid: thresholdsSchema, "similarity-only": thresholdsSchema }),
-  )
-  .parse(tunedThresholds);
+const tuned = tunedThresholdsSchema.parse(tunedThresholds);
 
 /** Thresholds per matching mode for an embedding model, tuned by the eval when available. */
-export function thresholdsFor(embeddingModel: string): {
-  source: "tuned" | "provisional";
-  modes: Record<MatchMode, Thresholds>;
-} {
+export function thresholdsFor(
+  embeddingModel: string,
+): Record<MatchMode, Thresholds & { basis: ThresholdBasis }> {
   const modes = tuned[embeddingModel];
-  return modes
-    ? { source: "tuned", modes }
-    : { source: "provisional", modes: PROVISIONAL_THRESHOLDS };
+  if (modes) return modes;
+  return {
+    hybrid: { ...PROVISIONAL_THRESHOLDS.hybrid, basis: "provisional" },
+    "similarity-only": {
+      ...PROVISIONAL_THRESHOLDS["similarity-only"],
+      basis: "provisional",
+    },
+  };
 }
+
+const VERDICTS = [
+  "same_problem",
+  "related_but_different",
+  "different",
+] as const;
+/** The model's judgement of a request against a candidate Problem. */
+export type Verdict = (typeof VERDICTS)[number];
 
 const matchSchema = z.object({
   verdict: z
-    .enum(["same_problem", "related_but_different", "different"])
+    .enum(VERDICTS)
     .describe(
       "same_problem: the request describes the same underlying need as the candidate. related_but_different: overlapping area, different need. different: no candidate matches.",
     ),
@@ -504,7 +526,7 @@ async function markSubmitted(
       problemId,
       tier,
       embedding,
-      embeddingModel: modelName(models.embedding),
+      embeddingModel: embeddingModelName(models.embedding),
       analysis,
     })
     .where(and(eq(requests.id, request.id), eq(requests.status, "analyzing")))
@@ -657,7 +679,10 @@ async function analyze(
     mode,
     abortSignal,
   });
-  const thresholds = thresholdsFor(modelName(models.embedding)).modes[mode];
+  const { low, high } = thresholdsFor(embeddingModelName(models.embedding))[
+    mode
+  ];
+  const thresholds = { low, high };
   const analysis: RequestAnalysis = {
     ...extraction,
     candidates,
@@ -802,13 +827,6 @@ async function findCandidates(
     .sort((a, b) => b[1] - a[1])
     .slice(0, CANDIDATE_COUNT)
     .map(([problemId, similarity]): Candidate => ({ problemId, similarity }));
-}
-
-/** `provider:model` name of an embedding model, as stored with each vector. */
-export function modelName(model: EmbeddingModel) {
-  return typeof model === "string"
-    ? model
-    : `${model.provider}:${model.modelId}`;
 }
 
 /** Keeps customer text from closing the prompt's delimiter tags. */
