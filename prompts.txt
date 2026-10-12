@@ -21,3 +21,143 @@ Response: Explored repo (GitHub remote, triage installed, single-context). User 
 [2026-10-12T01:38:11Z]
 Prompt: commit this
 Response: Committed CLAUDE.md, prompts.txt and docs/agents/* as the initial commit on master.
+
+
+[2026-10-12T01:44:58Z]
+Prompt: Shared MetaCTO assignment (AI-first Feature Intelligence System: submit/discover/support requests, AI-powered lifecycle step, Loom explaining problem, AI architecture, human judgment, metrics, tradeoffs) and invoked /grill-me to stress-test the design.
+Response: Started grill-me interview; asked first question on which lifecycle point/business problem to anchor the AI on.
+
+
+[2026-10-12T01:48:54Z]
+Prompt: Agreed intake (A) is the core; asked to clarify what "thin slice of B and C" means concretely.
+Response: Detailed thin B (per-cluster AI scoring vs defined criteria with rationale/evidence, PM-adjustable weights, override with reason) and thin C (on-demand decision brief, PM-recorded decision, AI-drafted per-audience status update approved by PM, in-app notifications); listed what is cut. Asked user to confirm scope.
+
+
+[2026-10-12T01:52:55Z]
+Prompt: Agreed to scope (A full depth, thin B and C, out-of-scope list); continue grilling.
+Response: Asked Q2 on core data model: Request vs Problem cluster and what users support.
+
+
+[2026-10-12T01:55:43Z]
+Prompt: Agreed two-level model (Request immutable -> Problem cluster, support on Problem, PM-locked edits), skip solution voting; continue.
+Response: Asked Q3 on intake flow UX: pre-submit dedupe suggestions, one clarifying question, post-submit agent decision with confidence tiers and PM review queue.
+
+
+[2026-10-12T02:04:19Z]
+Prompt: Q3 answers: clarifying questions configurable (variable count, future A/B testing); medium-confidence matches attach immediately; live dedupe check runs on "Next" click, not on typing pause (token usage).
+Response: Recorded decisions; asked Q4 on AI architecture: deterministic LLM pipeline vs tool-using agent, and model tiering.
+
+
+[2026-10-12T02:11:48Z]
+Prompt: Live dedupe check: run after short typing pause (embedding-only) but with a minimum character threshold. Agreed with Q4 architecture except framework: use Vercel AI SDK to stay provider-agnostic.
+Response: Verified AI SDK supports generateText+Output.object, tool loops with stopWhen step caps, and embed via context7. Recorded debounce+min-chars config and per-tier model config; flagged embedding-model swap requires re-embedding. Asked Q5 on app stack (Next.js, Postgres+pgvector, ORM, hosting).
+
+
+[2026-10-12T02:26:31Z]
+Prompt: Noted AI SDK ToolLoopAgent is better practice than raw generateText; defer full stack/docs check until before coding (check skills + correct implementation per library). Agreed full stack. Asked whether to define remaining libs (lint, styling, etc.) now or later.
+Response: Saved memories (verify-libs-before-coding, design decisions). Recommended locking cross-cutting tooling now and deferring leaf libs; proposed Biome, Tailwind+shadcn, Zod, Vitest + eval script, pnpm.
+
+
+[2026-10-12T02:33:39Z]
+Prompt: Tooling changes: bun as package manager; shadcn with Base UI (new default) not Radix; add date-fns and vercel/ms.
+Response: Accepted; noted Intl overlap for date display and where date-fns/ms earn their place; updated design memory. Asked Q6b: bun test vs Vitest.
+
+
+[2026-10-12T02:37:04Z]
+Prompt: Agreed bun test and keeping domain/AI logic out of Next-specific modules; continue.
+Response: Updated design memory. Asked Q7 on async intake processing, failure handling, and concurrent-duplicate race.
+
+
+[2026-10-12T03:17:39Z]
+Prompt: Q7: queue is overkill; let user see whether request went through, 2-3 automatic retries, then error suggesting retry later. Race: serialize problem creation with a transaction.
+Response: Clarified no queue was proposed; dropped cron. Flagged that a plain READ COMMITTED transaction does not prevent the race; recommended pg_advisory_xact_lock + re-search inside lock, LLM call outside lock. Asked Q7b: on final failure, is the raw Request kept (data-loss) or discarded.
+
+
+[2026-10-12T03:21:41Z]
+Prompt: Q7b: option B (submit only succeeds if analysis succeeds), but save failed submission as a draft in the user's requests.
+Response: Recorded draft status semantics (private to user, no support, not in PM queue, resubmit re-runs pipeline); updated design memory. Asked Q8 on trust boundaries: prompt injection from user text, output validation, customer-facing data leakage, rate limiting.
+
+
+[2026-10-12T03:25:49Z]
+Prompt: Agreed Q8 trust boundaries; continue.
+Response: Updated design memory. Asked Q9 on canonical statement regeneration cadence and score freshness (deterministic vs LLM-judged criteria).
+
+
+[2026-10-12T03:29:01Z]
+Prompt: Agreed Q9; strategy-doc change marks all stale with manual bulk rescore.
+Response: Updated design memory. Asked Q10 on success metrics and how to instrument them (event log, metrics page, eval baseline).
+
+
+[2026-10-12T03:32:46Z]
+Prompt: Asked what "analytics tool" means concretely vs the events table.
+Response: Clarified: product analytics SaaS (PostHog, Mixpanel, Amplitude, Segment) and AI observability tools (Langfuse, Helicone, LangSmith); explained tradeoffs and recommendation.
+
+
+[2026-10-12T03:34:56Z]
+Prompt: Chose self-hosted Langfuse tracing; agreed rest of Q10; continue.
+Response: Updated design memory; flagged Langfuse v3 self-host footprint and deployed-demo implication (tracing env-gated). Asked Q11 on seed/eval dataset: product domain, generation method, ground-truth labels.
+
+
+[2026-10-12T03:38:51Z]
+Prompt: Liked Q11 synthetic plan; asked whether importing a real open-source repo's issues would be better and which option is best.
+Response: Compared real OSS issues vs synthetic fixtures (realism + free duplicate ground truth vs no business context, bug-heavy, incomplete labels); recommended hybrid: synthetic Ledgerly for demo/full workflow, real OSS feature requests as a second eval set.
+
+
+[2026-10-12T03:40:48Z]
+Prompt: Agreed synthetic first, OSS eval as stretch; continue.
+Response: Updated design memory. Asked Q12 on how match confidence is derived (embedding similarity + LLM verdict vs LLM self-reported confidence) and threshold tuning.
+
+
+[2026-10-12T03:44:28Z]
+Prompt: Agreed confidence design with 95% high-tier precision; add flag to disable LLM verdict and rely only on similarity.
+Response: Recorded flag; noted verdict shares the intake call with extraction (flag drops verdict field, not the call), needs per-mode thresholds, and eval should report both modes as an ablation. Asked Q13 on screens/information architecture.
+
+
+[2026-10-12T03:46:58Z]
+Prompt: Agreed Q13 screens; anonymized Requests visible to submitters; matchMode + maxClarifyingQuestions editable in UI, thresholds read-only; continue.
+Response: Updated design memory. Asked Q14 on deadline/timebox and build order (vertical slices, cut line).
+
+
+[2026-10-12T03:51:14Z]
+Prompt: Deadlines don't apply; just work on this and don't ask such questions.
+Response: Saved feedback memory; adopted build order as-is. Wrote docs/design.md capturing all grill decisions and started step 0 (docs/skills pass) via parallel research agents.
+
+
+[2026-10-12T03:53:00Z]
+Prompt: Run `npx skills use "https://github.com/vercel-labs/skills" --skill "find-skills"` and follow the generated skill instructions.
+Response: Ran find-skills (skills.sh CLI); searched stack (ai sdk, nextjs, shadcn, drizzle, tailwind, biome, bun, langfuse, postgres, base ui); vetted by source + installs. User chose core 6 + supabase postgres best practices, project scope. Installed to .claude/skills (skills-lock.json): ai-sdk, vercel-react-best-practices, shadcn, neon-postgres, langfuse, next-dev-loop, supabase-postgres-best-practices; scanned for risky scripts/patterns (clean). Skipped drizzle/biome/tailwind/bun/base-ui (no trustworthy skill).
+
+
+[2026-10-12T03:58:34Z]
+Prompt: (background) Step 0 docs-pass agents finished: ui.md, ai-sdk.md, drizzle-pgvector.md, next-tooling.md written to docs/stack/.
+Response: Reconciled findings into docs/design.md: AI SDK v7, provider registry, voyage-4 1024 dims, Langfuse v4, Postgres 18 + pg driver + HNSW query rules, Next 16 on Node with bun as PM/test runner, ms 2.
+
+
+[2026-10-12T04:01:37Z]
+Prompt: Step-1 work in progress (scaffold, deps, Biome, compose, schema, migrations; fixtures agent launched). User asked why TS 5 instead of 7 and said not to make such decisions without asking.
+Response: Saved feedback memory; explained TS 5 came from the create-next-app pin; asked user to choose TS version.
+
+
+[2026-10-12T04:05:12Z]
+Prompt: Asked whether I was developing or setting up the environment; specs and issues must come first; do not start development until explicitly told.
+Response: Stopped work (killed fixtures agent before it wrote anything). Reported what step-1 setup exists (scaffold, deps, Biome, TS7, compose, schema + migrations) and offered to keep or revert it. Saved feedback memory.
+
+
+[2026-10-12T04:05:46Z]
+Prompt: Revert schema/migrations; write specs with /to-spec then /to-tickets.
+Response: Deleted src/db and drizzle/, reset local DB volume (empty Postgres running); environment setup kept. Next: user to invoke /to-spec.
+
+
+[2026-10-12T04:06:09Z]
+Prompt: /mattpocock-skills:to-spec (synthesize spec from context, confirm test seams, publish to GitHub with ready-for-agent).
+Response: Proposed test seams; user chose service-layer seam + Playwright E2E seam (fake model provider behind test env flag). Wrote spec (60 user stories, implementation/testing decisions, out of scope) and published as GitHub issue #1 with new ready-for-agent label.
+
+
+[2026-10-12T04:13:04Z]
+Prompt: /mattpocock-skills:to-tickets (break spec #1 into vertical-slice tickets with blocking edges, quiz user, publish).
+Response: User approved 18-ticket breakdown and blockers. Published issues #2-#19 (ready-for-agent, parent #1 referenced in body, not modified) with native GitHub blocked-by dependencies.
+
+
+[2026-10-12T04:17:01Z]
+Prompt: /mattpocock-skills:implement #2 and #3 (implement tickets with TDD at agreed seams, typecheck/test regularly, /code-review, commit).
+Response: Implemented #2 (schema accounts/users/events/settings + migrations, domain directory service with TDD tests on real test Postgres, provider registry + fake models, zod env, role switcher UI + Explore, seed script, Playwright 1.64.0 harness + role E2E) and #3 (Ledgerly fixtures + validator, via agent; rebalanced holdout tags). Ran two-axis code review, fixed env validation, seed script name, enum-derived types, Pick<Deps,"db">, $client, fake switch moved to composition root, per-split tag check, E2E account assertion. Lint/typecheck/4 unit/1 E2E green. Committed to master.
