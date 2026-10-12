@@ -37,6 +37,8 @@ const analysis = {
   proposedSolution: "Zapier integration to Google Sheets",
   persona: "Bookkeeper",
   severity: "medium",
+  // Grouping is covered in grouping.test.ts; here the model never claims a match.
+  match: { verdict: "different", problemId: null, rationale: "Unrelated" },
 };
 
 const okModels = () =>

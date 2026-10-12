@@ -34,3 +34,17 @@ export function scriptedModels({
   const models: Models = { intake: language, reasoning: language, embedding };
   return { models, language };
 }
+
+/** Unit vector whose cosine similarity with `axisVector(0)` is exactly `similarity`. */
+export function similarVector(similarity: number): number[] {
+  return Array.from({ length: EMBEDDING_DIMENSIONS }, (_, i) =>
+    i === 0 ? similarity : i === 1 ? Math.sqrt(1 - similarity ** 2) : 0,
+  );
+}
+
+/** Problem ids offered to the model as candidates, read from the prompt it received. */
+export function candidateIds(prompt: unknown): number[] {
+  return [...JSON.stringify(prompt).matchAll(/<candidate id=\\"(\d+)\\"/g)].map(
+    (m) => Number(m[1]),
+  );
+}

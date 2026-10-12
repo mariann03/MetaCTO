@@ -271,3 +271,8 @@ Response: Committed review fixes; added analyzing request status (TDD): atomic d
 [2026-10-12T07:38:05Z]
 Prompt: Looking good, merge PR #21 and list next issues.
 Response: Merged PR #21 into main (closes #4), synced local main, listed unblocked open issues.
+
+
+[2026-10-12T07:41:14Z]
+Prompt: /mattpocock-skills:implement #6 (confidence tiers and auto-grouping).
+Response: (in progress) Implementing #6 on branch feat/6-confidence-tiers.

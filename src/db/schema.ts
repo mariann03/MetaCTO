@@ -29,6 +29,9 @@ export const problemStatus = pgEnum("problem_status", [
   "declined",
   "shipped",
 ]);
+/** How sure intake was about a grouping: high attaches, medium attaches for review, low creates. */
+export const matchTier = pgEnum("match_tier", ["high", "medium", "low"]);
+
 // draft: saved but not analyzed; analyzing: a run holds it; submitted: grouped into a Problem.
 export const requestStatus = pgEnum("request_status", [
   "draft",
@@ -91,6 +94,8 @@ export const settings = pgTable("settings", {
 export const problems = pgTable("problems", {
   id: id(),
   statement: text("statement").notNull(),
+  // A PM-locked statement is never rewritten by AI.
+  statementLocked: boolean("statement_locked").notNull().default(false),
   status: problemStatus("status").notNull().default("open"),
   createdAt: createdAt(),
 });
@@ -127,6 +132,9 @@ export const requests = pgTable(
     embedding: vector("embedding", { dimensions: EMBEDDING_DIMENSIONS }),
     embeddingModel: text("embedding_model"),
     analysis: jsonb("analysis").$type<RequestAnalysis>(),
+    tier: matchTier("tier"),
+    // Set when the submitter says the grouping is wrong ("Not the same? Split it out").
+    splitRequestedAt: timestamp("split_requested_at", { withTimezone: true }),
     createdAt: createdAt(),
   },
   (t) => [

@@ -4,8 +4,11 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { z } from "zod";
 import {
+  type MatchMode,
+  requestSplit,
   resubmitDraft,
   type SubmitResult,
+  setMatchMode,
   submitRequest,
 } from "@/domain/intake";
 import { deps } from "@/server/deps";
@@ -78,6 +81,36 @@ export async function resubmitDraftAction(
   });
   revalidatePath("/my-requests");
   return result;
+}
+
+export type SplitState = { status: "idle" | "requested" };
+
+export async function requestSplitAction(
+  requestId: number,
+  _prev: SplitState,
+): Promise<SplitState> {
+  const user = await currentUser();
+  await requestSplit(deps, {
+    userId: user.id,
+    requestId: z.number().int().positive().parse(requestId),
+  });
+  return { status: "requested" };
+}
+
+export type MatchModeState = { status: "idle" | "saved" | "forbidden" };
+
+export async function setMatchModeAction(
+  _prev: MatchModeState,
+  form: FormData,
+): Promise<MatchModeState> {
+  const user = await currentUser();
+  if (user.role !== "pm") return { status: "forbidden" };
+  const mode: MatchMode = z
+    .enum(["hybrid", "similarity-only"])
+    .parse(form.get("mode"));
+  await setMatchMode(deps, { mode, userId: user.id });
+  revalidatePath("/settings");
+  return { status: "saved" };
 }
 
 async function currentUser() {

@@ -1,14 +1,25 @@
 import Link from "next/link";
 import type { SubmitState } from "@/app/actions";
+import { SplitButton } from "./split-button";
 
 /** Tells the submitter what happened to their request. */
 export function SubmitResultMessage({ state }: { state: SubmitState }) {
   switch (state.status) {
     case "submitted":
-      return (
+      return state.grouping === "new" ? (
         <p role="status" className="rounded-md border bg-muted p-3 text-sm">
           New problem created: <strong>{state.statement}</strong>
         </p>
+      ) : (
+        <div
+          role="status"
+          className="space-y-2 rounded-md border bg-muted p-3 text-sm"
+        >
+          <p>
+            Grouped into: <strong>{state.statement}</strong>
+          </p>
+          <SplitButton requestId={state.requestId} />
+        </div>
       );
     case "draft":
       return (
