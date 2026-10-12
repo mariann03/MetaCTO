@@ -6,7 +6,7 @@ import {
   expect,
   test,
 } from "bun:test";
-import { inArray } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { problems } from "@/db/schema";
 import {
@@ -138,18 +138,12 @@ describe("listCriteria", () => {
   });
 
   test("leaves out Problems already decided: shipped or declined", async () => {
-    await db
-      .update(problems)
-      .set({ status: "shipped" })
-      .where(inArray(problems.id, [ids.sso]));
-    await db
-      .update(problems)
-      .set({ status: "declined" })
-      .where(inArray(problems.id, [ids.audit]));
-    await db
-      .update(problems)
-      .set({ status: "planned" })
-      .where(inArray(problems.id, [ids.payroll]));
+    for (const [id, status] of [
+      [ids.sso, "shipped"],
+      [ids.audit, "declined"],
+      [ids.payroll, "planned"],
+    ] as const)
+      await db.update(problems).set({ status }).where(eq(problems.id, id));
 
     expect((await listCriteria({ db })).map((c) => c.statement)).toEqual([
       "Exports",

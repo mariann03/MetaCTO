@@ -5,25 +5,8 @@ export const CRITERIA = ["reach", "businessValue"] as const;
 export type Criterion = (typeof CRITERIA)[number];
 export type Weights = Record<Criterion, number>;
 
-type Top = (of: (p: ProblemCriteria) => number) => number;
-
 // ARR of accounts at risk of churning counts twice. Segment mix is shown, not scored: ARR already follows it.
 const value = (p: ProblemCriteria) => p.arr + p.churnRiskArr;
-
-/** Each criterion's 0-1 score for a Problem, given the best value any Problem has. */
-const SCORERS: Record<Criterion, (top: Top) => (p: ProblemCriteria) => number> =
-  {
-    // Supporters and accounts in equal parts.
-    reach: (top) => {
-      const supporters = top((p) => p.supporters);
-      const accounts = top((p) => p.accounts);
-      return (p) => (p.supporters / supporters + p.accounts / accounts) / 2;
-    },
-    businessValue: (top) => {
-      const best = top(value);
-      return (p) => value(p) / best;
-    },
-  };
 
 /**
  * Scores each criterion from 0 to 1 against the top Problem on it, then orders by the
@@ -32,15 +15,23 @@ const SCORERS: Record<Criterion, (top: Top) => (p: ProblemCriteria) => number> =
  */
 export function rank(problems: ProblemCriteria[], weights: Weights) {
   // ponytail: linear against the top Problem, so one huge account flattens the rest; log-scale ARR if that hides real differences.
-  const top: Top = (of) => Math.max(0, ...problems.map(of)) || 1;
-  const scorers = CRITERIA.map((c) => [c, SCORERS[c](top)] as const);
+  const top = (of: (p: ProblemCriteria) => number) =>
+    Math.max(0, ...problems.map(of)) || 1;
+  const most = {
+    supporters: top((p) => p.supporters),
+    accounts: top((p) => p.accounts),
+    value: top(value),
+  };
   const totalWeight = CRITERIA.reduce((sum, c) => sum + weights[c], 0);
 
   return problems
     .map((p) => {
-      const scores = Object.fromEntries(
-        scorers.map(([c, score]) => [c, score(p)]),
-      ) as Weights;
+      const scores: Weights = {
+        // Supporters and accounts in equal parts.
+        reach:
+          (p.supporters / most.supporters + p.accounts / most.accounts) / 2,
+        businessValue: value(p) / most.value,
+      };
       const weighted = CRITERIA.reduce(
         (sum, c) => sum + weights[c] * scores[c],
         0,
@@ -50,5 +41,3 @@ export function rank(problems: ProblemCriteria[], weights: Weights) {
     })
     .sort((a, b) => b.score - a.score || a.id - b.id);
 }
-
-export type RankedProblem = ReturnType<typeof rank>[number];

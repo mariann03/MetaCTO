@@ -36,10 +36,10 @@ const points = (score: number) => Math.round(score * 100);
 /** Problems ranked by the PM's weights; moving a slider reorders them at once, in the browser. */
 export function Ranking({ criteria }: { criteria: ProblemCriteria[] }) {
   // ponytail: weights reset on reload; persist them in settings once PMs want a saved ranking.
-  const [weights, setWeights] = useState(
-    () =>
-      Object.fromEntries(CRITERIA.map((c) => [c, DEFAULT_WEIGHT])) as Weights,
-  );
+  const [weights, setWeights] = useState<Weights>({
+    reach: DEFAULT_WEIGHT,
+    businessValue: DEFAULT_WEIGHT,
+  });
   const ranked = rank(criteria, weights);
 
   return (
