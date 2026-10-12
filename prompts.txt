@@ -343,3 +343,23 @@ Response: Listed open issues with their blockers; recommended #5 (first step of 
 [2026-10-12T17:30:00Z]
 Prompt: /mattpocock-skills:implement #5 (live matching and deflection)
 Response: Added supports.note and a problems module: embedding-only matching grouped by Problem (top 3 with statement and supporters), +1 with optional note (one per user; request_deflected from submit, support_added from Explore), Problem list with supporter counts. Submit is two-step (Next) with live matches after a 500 ms pause from 30 chars; Explore lists Problems with +1. Service tests and a deflection E2E; existing E2E specs go through Next.
+
+[2026-10-12T18:30:00Z]
+Prompt: merge it
+Response: Merged PR #26 (#5 live matching and deflection) with a merge commit; #5 closed. Checked out main and pulled.
+
+[2026-10-12T19:30:00Z]
+Prompt: /mattpocock-skills:implement #12 (prioritization: SQL criteria and weighted ranking)
+Response: Added listCriteria (Reach: distinct supporters and accounts; Business value: ARR once per account, at-risk ARR, segment mix) computed in SQL on read, and a pure rank() that scores each criterion 0-1 against the top Problem and orders by the weighted average. PM-only Priorities page with weight sliders ranks in the browser. Service tests on a known dataset and an E2E for the sliders.
+
+[2026-10-12T20:00:00Z]
+Prompt: /ponytail:ponytail-review
+Response: Listed cuts for the #12 diff: replace the curried SCORERS factory in rank() with maxima computed once and an object literal, delete the unused RankedProblem type, plain useState for weights, loop the status updates in the test (about -22 lines). Not applied.
+
+[2026-10-12T20:10:00Z]
+Prompt: maybe we should move plural to a helpers or utils file
+Response: Moved plural() to src/lib/utils.ts and used it in the Priorities table and in ProblemItem, which built the same "N supporter(s)" label by hand. Lint, typecheck and E2E pass.
+
+[2026-10-12T20:20:00Z]
+Prompt: apply the ponytail cuts, then merge
+Response: rank() now computes the maxima once and scores with an object literal (no scorer factory), dropped the unused RankedProblem type, plain useState for weights, looped the status updates in the test (-17 lines). Unit and E2E suites pass. Merged PR #27; #12 closed.
