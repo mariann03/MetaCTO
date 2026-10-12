@@ -90,3 +90,12 @@ export async function listUsers({ db }: DbDeps) {
 
 /** A user as listed by the role switcher: id, name, role and their account (null for staff and PMs). */
 export type DirectoryUser = Awaited<ReturnType<typeof listUsers>>[number];
+
+/** Throws unless the user is a PM; PM-only operations call it first. */
+export async function requirePm({ db }: DbDeps, userId: number, what: string) {
+  const [user] = await db
+    .select({ role: users.role })
+    .from(users)
+    .where(eq(users.id, userId));
+  if (user?.role !== "pm") throw new Error(`Only a PM can ${what}`);
+}

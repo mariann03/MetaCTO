@@ -1,7 +1,8 @@
 import { eq } from "drizzle-orm";
 import type { Db } from "@/db/client";
-import { events, settings, users } from "@/db/schema";
+import { events, settings } from "@/db/schema";
 import type { DbDeps } from "./deps";
+import { requirePm } from "./directory";
 
 /** Settings rows by key; every setting lives in the key/value `settings` table. */
 const KEYS = { strategy: "strategy", matchMode: "matchMode" } as const;
@@ -41,12 +42,7 @@ export async function setMatchMode(
   { db }: DbDeps,
   { mode, userId }: { mode: MatchMode; userId: number },
 ) {
-  const [user] = await db
-    .select({ role: users.role })
-    .from(users)
-    .where(eq(users.id, userId));
-  if (user?.role !== "pm")
-    throw new Error("Only a PM can change the matching mode");
+  await requirePm({ db }, userId, "change the matching mode");
   await db.transaction(async (tx) => {
     await tx
       .insert(settings)
