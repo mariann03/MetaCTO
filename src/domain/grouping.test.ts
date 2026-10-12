@@ -170,13 +170,9 @@ describe("hybrid tiers (verdict × similarity)", () => {
         throw new Error("not submitted");
 
       expect(followUp.tier).toBe(tier);
-      if (tier === "low") {
-        expect(followUp.grouping).toBe("new");
+      if (tier === "low")
         expect(followUp.problemId).not.toBe(original.problemId);
-      } else {
-        expect(followUp.grouping).toBe("grouped");
-        expect(followUp.problemId).toBe(original.problemId);
-      }
+      else expect(followUp.problemId).toBe(original.problemId);
       const [row] = await db
         .select({ tier: requests.tier })
         .from(requests)
@@ -215,7 +211,6 @@ describe("grouping", () => {
     const { original } = await submitPair({});
     expect(original).toMatchObject({
       status: "submitted",
-      grouping: "new",
       tier: "low",
     });
   });
@@ -338,7 +333,7 @@ describe("grouping", () => {
 
     expect(followUp).toMatchObject({
       status: "submitted",
-      grouping: "grouped",
+      tier: "high",
       statement: extraction.problemStatement,
     });
   });
@@ -375,11 +370,6 @@ describe("grouping", () => {
     expect(
       results.map((r) => (r.status === "submitted" ? r.tier : r.status)).sort(),
     ).toEqual(["low", "medium"]);
-    expect(
-      results
-        .map((r) => (r.status === "submitted" ? r.grouping : r.status))
-        .sort(),
-    ).toEqual(["grouped", "new"]);
   });
 });
 

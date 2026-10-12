@@ -6,7 +6,7 @@ import { SplitButton } from "./split-button";
 export function SubmitResultMessage({ state }: { state: SubmitState }) {
   switch (state.status) {
     case "submitted":
-      return state.grouping === "new" ? (
+      return state.tier === "low" ? (
         <p role="status" className="rounded-md border bg-muted p-3 text-sm">
           New problem created: <strong>{state.statement}</strong>
         </p>
@@ -18,7 +18,8 @@ export function SubmitResultMessage({ state }: { state: SubmitState }) {
           <p>
             Grouped into: <strong>{state.statement}</strong>
           </p>
-          <SplitButton requestId={state.requestId} />
+          {/* Keyed so a later grouped submission gets a fresh button, not the last one's "Thanks". */}
+          <SplitButton key={state.requestId} requestId={state.requestId} />
         </div>
       );
     case "draft":

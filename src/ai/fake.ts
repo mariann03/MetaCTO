@@ -59,7 +59,8 @@ const fakeGenerate: Generate = async ({ prompt }) => {
   const candidate = [
     ...text.matchAll(/<candidate id=\\"(\d+)\\">(.*?)<\/candidate>/g),
   ].find((m) => m[2] === problemStatement)?.[1];
-  const asked = text.includes("<candidates>");
+  // Not "<candidates>": the intake instructions mention that tag on every call.
+  const asked = text.includes("<candidate id=");
   return jsonResult({
     problemStatement,
     underlyingProblem: need,

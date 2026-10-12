@@ -9,6 +9,7 @@ import {
   gte,
   inArray,
   isNotNull,
+  notInArray,
   sql,
 } from "drizzle-orm";
 import ms from "ms";
@@ -103,8 +104,7 @@ export type SubmitResult =
       requestId: number;
       problemId: number;
       statement: string;
-      /** new: started a Problem; grouped: attached to an existing one. */
-      grouping: "new" | "grouped";
+      /** low: started a new Problem; high or medium: grouped into an existing one. */
       tier: Tier;
     }
   | { status: "draft"; requestId: number }
@@ -236,7 +236,6 @@ async function currentOutcome(
         requestId,
         problemId: row.problemId,
         statement: row.statement,
-        grouping: row.tier === "low" ? "new" : "grouped",
         tier: row.tier,
       }
     : { status: "analyzing", requestId };
@@ -303,17 +302,16 @@ async function runSubmission(
     return { status: "draft", requestId: request.id };
   }
 
-  const { problemId, tier } = placeRequest(result.analysis);
-  if (problemId === null)
-    return createProblemFromRequest(deps, request, result);
+  const { candidate, tier } = placeRequest(result.analysis);
+  if (!candidate) return createProblemFromRequest(deps, request, result);
 
   const grouped = await deps.db.transaction((tx) =>
-    attach(tx, deps, request, result, problemId, tier),
+    attach(tx, deps, request, result, candidate, tier),
   );
   // Only a confident grouping refines the statement; a medium one waits for the PM's review.
   const statement =
     tier === "high"
-      ? await refineStatement(deps, problemId, request)
+      ? await refineStatement(deps, candidate.problemId, request)
       : grouped.statement;
   return { ...grouped, statement };
 }
@@ -321,31 +319,33 @@ async function runSubmission(
 type Analyzed = Awaited<ReturnType<typeof analyze>>;
 type Submitted = Extract<SubmitResult, { status: "submitted" }>;
 
-/** The tier table: where a request goes, given its candidates and the model's verdict. */
+/** The tier table: where a request goes (null: a new Problem), given its candidates and the model's verdict. */
 function placeRequest({ candidates, match, mode }: RequestAnalysis): {
   tier: Tier;
-  problemId: number | null;
+  candidate: Candidate | null;
 } {
   const best = candidates[0];
-  if (!best) return { tier: "low", problemId: null };
+  if (!best) return { tier: "low", candidate: null };
   const { low, high } = THRESHOLDS[mode];
 
   if (!match) {
-    if (best.similarity >= high)
-      return { tier: "high", problemId: best.problemId };
-    if (best.similarity >= low)
-      return { tier: "medium", problemId: best.problemId };
-    return { tier: "low", problemId: null };
+    if (best.similarity >= high) return { tier: "high", candidate: best };
+    if (best.similarity >= low) return { tier: "medium", candidate: best };
+    return { tier: "low", candidate: null };
   }
   // The model's "different" always starts a Problem; new Problems reach the PM review anyway.
-  if (match.verdict === "different") return { tier: "low", problemId: null };
+  if (match.verdict === "different") return { tier: "low", candidate: null };
 
   // analyze() guarantees the named Problem is one of the candidates.
   const named = candidates.find((c) => c.problemId === match.problemId);
   if (!named) throw new Error(`Problem ${match.problemId} is not a candidate`);
-  return match.verdict === "same_problem" && named.similarity >= high
-    ? { tier: "high", problemId: named.problemId }
-    : { tier: "medium", problemId: named.problemId };
+  return {
+    tier:
+      match.verdict === "same_problem" && named.similarity >= high
+        ? "high"
+        : "medium",
+    candidate: named,
+  };
 }
 
 /** Opens a new Problem for the request, unless a matching one appeared while it was analyzed. */
@@ -362,17 +362,17 @@ async function createProblemFromRequest(
     );
     // A near-identical request may have created a Problem while this one was being analyzed.
     // Problems that were already candidates were judged by the model, so only new ones count.
-    const judged = new Set(
+    // They are excluded in SQL: filtered after the top-N cut, they could crowd out the new one.
+    const [meanwhile] = await findCandidates(
+      tx,
+      analyzed.embedding,
       analyzed.analysis.candidates.map((c) => c.problemId),
-    );
-    const meanwhile = (await findCandidates(tx, analyzed.embedding)).find(
-      (c) => !judged.has(c.problemId),
     );
     if (
       meanwhile &&
       meanwhile.similarity >= THRESHOLDS[analyzed.analysis.mode].high
     )
-      return attach(tx, deps, request, analyzed, meanwhile.problemId, "medium");
+      return attach(tx, deps, request, analyzed, meanwhile, "medium");
 
     const [problem] = await tx
       .insert(problems)
@@ -395,7 +395,6 @@ async function createProblemFromRequest(
       requestId: request.id,
       problemId: problem.id,
       statement,
-      grouping: "new",
       tier: "low",
     };
   });
@@ -407,11 +406,11 @@ async function attach(
   deps: Deps,
   request: RequestText,
   analyzed: Analyzed,
-  problemId: number,
+  { problemId, similarity }: Candidate,
   tier: Tier,
 ): Promise<Submitted> {
   await markSubmitted(tx, deps, request, analyzed, problemId, tier);
-  const { match, candidates } = analyzed.analysis;
+  const { match } = analyzed.analysis;
   await tx.insert(events).values({
     type: "request_grouped",
     actor: "ai",
@@ -420,9 +419,9 @@ async function attach(
     payload: {
       problemId,
       tier,
-      verdict: match?.verdict ?? null,
-      similarity:
-        candidates.find((c) => c.problemId === problemId)?.similarity ?? null,
+      // Null when the model never judged this Problem (similarity-only, or found under the lock).
+      verdict: match?.problemId === problemId ? match.verdict : null,
+      similarity,
     },
   });
   const [problem] = await tx
@@ -435,7 +434,6 @@ async function attach(
     requestId: request.id,
     problemId,
     statement: problem.statement,
-    grouping: "grouped",
     tier,
   };
 }
@@ -501,12 +499,17 @@ async function refineStatement(
       return problem.statement;
 
     return await db.transaction(async (tx) => {
-      // The PM may have locked it while the model was answering.
+      // The PM may have locked it, or a concurrent refinement changed it, while the model
+      // was answering; overwriting would drop that change, so this one is skipped.
       const [updated] = await tx
         .update(problems)
         .set({ statement })
         .where(
-          and(eq(problems.id, problemId), eq(problems.statementLocked, false)),
+          and(
+            eq(problems.id, problemId),
+            eq(problems.statementLocked, false),
+            eq(problems.statement, problem.statement),
+          ),
         )
         .returning({ id: problems.id });
       if (!updated) return problem.statement;
@@ -596,8 +599,10 @@ async function analyze(
     abortSignal,
   });
   // The output schema depends on askVerdict, so re-read it with precise types (no casts).
-  const match =
-    z.object({ match: matchSchema.nullish() }).parse(output).match ?? null;
+  // An unasked verdict is never read, so similarity-only stays on the thresholds alone.
+  const match = askVerdict
+    ? z.object({ match: matchSchema }).parse(output).match
+    : null;
   const extraction = extractionSchema.parse(output);
   // The model may only point at a Problem it was offered; anything else is a failed analysis.
   const offered = (id: number | null) =>
@@ -640,7 +645,11 @@ async function candidatesMarkup(db: Db, candidates: Candidate[]) {
 }
 
 /** Problems whose submitted requests are closest to the embedding, best match per Problem. */
-async function findCandidates(tx: Tx, embedding: number[]) {
+async function findCandidates(
+  tx: Tx,
+  embedding: number[],
+  excludeProblemIds: number[] = [],
+) {
   const distance = cosineDistance(requests.embedding, embedding);
   // Without this, filtering after the HNSW scan can return fewer rows than asked for.
   await tx.execute(sql`set local hnsw.iterative_scan = relaxed_order`);
@@ -650,7 +659,13 @@ async function findCandidates(tx: Tx, embedding: number[]) {
       similarity: sql<number>`1 - (${distance})`.mapWith(Number),
     })
     .from(requests)
-    .where(and(eq(requests.status, "submitted"), isNotNull(requests.problemId)))
+    .where(
+      and(
+        eq(requests.status, "submitted"),
+        isNotNull(requests.problemId),
+        notInArray(requests.problemId, excludeProblemIds),
+      ),
+    )
     .orderBy(asc(distance))
     .limit(CANDIDATE_REQUEST_POOL);
 
