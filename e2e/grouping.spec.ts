@@ -29,4 +29,11 @@ test("a request for an existing need is grouped and can be split out", async ({
   await expect(result).toContainText(
     "Thanks. A product manager will review the grouping.",
   );
+
+  await page.goto("/my-requests");
+  await expect(
+    page.getByText(
+      "Split requested. A product manager will review the grouping.",
+    ),
+  ).toBeVisible();
 });

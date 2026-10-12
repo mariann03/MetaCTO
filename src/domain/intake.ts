@@ -9,6 +9,7 @@ import {
   gte,
   inArray,
   isNotNull,
+  isNull,
   notInArray,
   sql,
 } from "drizzle-orm";
@@ -196,6 +197,8 @@ export async function listMyRequests({ db }: DbDeps, userId: number) {
         (typeof requests.status.enumValues)[number]
       >`case when ${isDraft} then 'draft' else ${requests.status} end`,
       createdAt: requests.createdAt,
+      canSplit: sql<boolean>`${canSplit}`,
+      splitRequested: sql<boolean>`${requests.splitRequestedAt} is not null`,
       problemId: problems.id,
       statement: problems.statement,
     })
@@ -212,6 +215,13 @@ export async function listMyRequests({ db }: DbDeps, userId: number) {
         : null,
   }));
 }
+
+/** Grouped into an existing Problem and not yet disputed: the submitter may ask for a split. */
+const canSplit = and(
+  eq(requests.status, "submitted"),
+  inArray(requests.tier, ["high", "medium"]),
+  isNull(requests.splitRequestedAt),
+);
 
 /** A plain draft, or one whose analysis run went stale (crashed before finishing). */
 const isDraft = sql<boolean>`(${requests.status} = 'draft' or (${requests.status} = 'analyzing' and ${requests.analysisStartedAt} < ${STALE_ANALYSIS}))`;
@@ -348,6 +358,17 @@ function placeRequest({ candidates, match, mode }: RequestAnalysis): {
   };
 }
 
+/**
+ * How similar a Problem created during the analysis must be to count as a match.
+ * Without a verdict, similarity-only groups from its low threshold in sequence, so it does here too;
+ * hybrid has no verdict on the new Problem, so only a confident similarity counts.
+ */
+function lockMatchThreshold(mode: MatchMode) {
+  return mode === "similarity-only"
+    ? THRESHOLDS[mode].low
+    : THRESHOLDS[mode].high;
+}
+
 /** Opens a new Problem for the request, unless a matching one appeared while it was analyzed. */
 async function createProblemFromRequest(
   deps: Deps,
@@ -370,7 +391,7 @@ async function createProblemFromRequest(
     );
     if (
       meanwhile &&
-      meanwhile.similarity >= THRESHOLDS[analyzed.analysis.mode].high
+      meanwhile.similarity >= lockMatchThreshold(analyzed.analysis.mode)
     )
       return attach(tx, deps, request, analyzed, meanwhile, "medium");
 
@@ -525,12 +546,26 @@ async function refineStatement(
       });
       return statement;
     });
-  } catch {
+  } catch (error) {
+    // Best effort, but visible: the grouping stands and the failure is on record.
+    await db.insert(events).values({
+      type: "statement_refinement_failed",
+      actor: "ai",
+      entityType: "problem",
+      entityId: problemId,
+      payload: {
+        requestId: request.id,
+        error: error instanceof Error ? error.message : String(error),
+      },
+    });
     return problem.statement;
   }
 }
 
-/** The submitter disputes the grouping ("Not the same? Split it out"); a PM reviews it. */
+/**
+ * The submitter disputes the grouping ("Not the same? Split it out"); a PM reviews it.
+ * Asking again is a no-op, so the first dispute time and event stand.
+ */
 export async function requestSplit(
   { db }: DbDeps,
   { userId, requestId }: { userId: number; requestId: number },
@@ -539,18 +574,25 @@ export async function requestSplit(
     .update(requests)
     .set({ splitRequestedAt: sql`now()` })
     .where(
-      and(
-        eq(requests.id, requestId),
-        eq(requests.authorId, userId),
-        eq(requests.status, "submitted"),
-        inArray(requests.tier, ["high", "medium"]),
-      ),
+      and(eq(requests.id, requestId), eq(requests.authorId, userId), canSplit),
     )
     .returning({ problemId: requests.problemId });
-  if (!row)
+  if (!row) {
+    const [already] = await db
+      .select({ id: requests.id })
+      .from(requests)
+      .where(
+        and(
+          eq(requests.id, requestId),
+          eq(requests.authorId, userId),
+          isNotNull(requests.splitRequestedAt),
+        ),
+      );
+    if (already) return;
     throw new Error(
       `Request ${requestId} is not a grouped request of this user`,
     );
+  }
   await db.insert(events).values({
     type: "split_requested",
     actor: "user",

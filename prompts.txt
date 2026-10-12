@@ -286,3 +286,13 @@ Response: Added acceptance criterion to #10 (accepting a medium grouping refines
 [2026-10-12T08:24:40Z]
 Prompt: Use TanStack Table for complex tables (noted for later) and shadcn table components for every table.
 Response: Saved as a feedback memory; replaced the raw thresholds table on the Settings page with shadcn Table components; pushed to PR #22.
+
+
+[2026-10-12T08:33:01Z]
+Prompt: /code-review xhigh --fix (run by user on PR #22 branch).
+Response: Review found 15 issues, fixed 8 (tier backfill in migration 0004, lock re-check excludes judged Problems in-query, compare-and-set statement refinement, keyed SplitButton, accurate request_grouped event data, match read only when asked, fake verdict check, removed redundant grouping field). Verified checks incl. E2E; asked user about the 7 unfixed.
+
+
+[2026-10-12T08:36:58Z]
+Prompt: Fix review findings 1-4 (split-out in My requests, similarity-only lock threshold, idempotent split request, log refinement failures).
+Response: Implemented test-first: My requests shows split-out on grouped undisputed rows and a split-requested note; lock re-check uses the low threshold in similarity-only mode; repeat split requests are a no-op; failed refinements record statement_refinement_failed. 58 unit + 5 E2E green; committed and pushed to PR #22.

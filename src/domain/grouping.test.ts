@@ -24,6 +24,7 @@ import {
 import { seedPeople } from "../../test/seed";
 import type { Deps } from "./deps";
 import {
+  listMyRequests,
   requestSplit,
   type SubmitResult,
   submitRequest,
@@ -338,6 +339,57 @@ describe("grouping", () => {
     });
   });
 
+  test("a failed statement update is recorded as an event", async () => {
+    await submitPair({
+      similarity: hybrid.high + 0.05,
+      updated: new Error("model unavailable"),
+    });
+
+    const failures = (await db.select().from(events)).filter(
+      (e) => e.type === "statement_refinement_failed",
+    );
+    expect(failures).toHaveLength(1);
+    expect(failures[0]?.payload).toMatchObject({ error: "model unavailable" });
+  });
+
+  test("in similarity-only mode, concurrent requests that would group in sequence still group", async () => {
+    await setMatchMode(
+      { db },
+      { mode: "similarity-only", userId: people.priya },
+    );
+    let arrived = 0;
+    let releaseBoth = () => {};
+    const bothArrived = new Promise<void>((resolve) => {
+      releaseBoth = resolve;
+    });
+    const similarity = between(simOnly);
+    const { models: m } = scriptedModels({
+      embed: (text) =>
+        text.includes("Follow-up") ? similarVector(similarity) : axisVector(0),
+      generate: async () => {
+        arrived += 1;
+        if (arrived === 2) releaseBoth();
+        await bothArrived;
+        return jsonResult(extraction);
+      },
+    });
+
+    await Promise.all([
+      submitRequest(deps(m), {
+        authorId: people.alice,
+        title: "Zapier integration",
+        description: "We retype every invoice into Google Sheets.",
+      }),
+      submitRequest(deps(m), {
+        authorId: people.bob,
+        title: "Follow-up: sync invoices to sheets",
+        description: "Copying invoice totals into Excel takes hours.",
+      }),
+    ]);
+
+    expect(await db.select().from(problems)).toHaveLength(1);
+  });
+
   test("two near-identical requests submitted at once produce one Problem", async () => {
     let arrived = 0;
     let releaseBoth = () => {};
@@ -374,6 +426,50 @@ describe("grouping", () => {
 });
 
 describe("requestSplit", () => {
+  test("asking twice keeps the first request and records it once", async () => {
+    const { followUp } = await submitPair({ similarity: hybrid.high + 0.05 });
+    if (followUp.status !== "submitted") throw new Error("not submitted");
+    const ask = { userId: people.bob, requestId: followUp.requestId };
+
+    await requestSplit({ db }, ask);
+    const [first] = await db
+      .select({ at: requests.splitRequestedAt })
+      .from(requests)
+      .where(eq(requests.id, followUp.requestId));
+    await requestSplit({ db }, ask);
+
+    const [second] = await db
+      .select({ at: requests.splitRequestedAt })
+      .from(requests)
+      .where(eq(requests.id, followUp.requestId));
+    expect(second?.at).toEqual(first?.at ?? null);
+    const splits = (await db.select().from(events)).filter(
+      (e) => e.type === "split_requested",
+    );
+    expect(splits).toHaveLength(1);
+  });
+
+  test("My requests offers split-out only on grouped requests not yet disputed", async () => {
+    const { original, followUp } = await submitPair({
+      similarity: hybrid.high + 0.05,
+    });
+    if (followUp.status !== "submitted") throw new Error("not submitted");
+    if (original.status !== "submitted") throw new Error("not submitted");
+
+    const [bobBefore] = await listMyRequests({ db }, people.bob);
+    const [alices] = await listMyRequests({ db }, people.alice);
+    await requestSplit(
+      { db },
+      { userId: people.bob, requestId: followUp.requestId },
+    );
+    const [bobAfter] = await listMyRequests({ db }, people.bob);
+
+    expect(bobBefore?.canSplit).toBe(true);
+    expect(alices?.canSplit).toBe(false);
+    expect(bobAfter?.canSplit).toBe(false);
+    expect(bobAfter?.splitRequested).toBe(true);
+  });
+
   test("the submitter of a grouped request can ask for it to be split out", async () => {
     const { followUp } = await submitPair({ similarity: hybrid.high + 0.05 });
     if (followUp.status !== "submitted") throw new Error("not submitted");
