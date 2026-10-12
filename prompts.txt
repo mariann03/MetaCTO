@@ -266,3 +266,8 @@ Response: Reviewed the #4 diff (10 angles + sweep). Fixed: submit form keeps typ
 [2026-10-12T07:34:38Z]
 Prompt: Finding #2: add an analyzing status (recommended); then commit review fixes and push to PR #21.
 Response: Committed review fixes; added analyzing request status (TDD): atomic draft->analyzing claim on resubmit, stale runs (>5 min) count as drafts, failures return to draft, My requests shows Analyzing with no button, analyzing outcome message; migration 0003; design doc updated. 28 unit + 4 E2E green; pushed to PR #21.
+
+
+[2026-10-12T07:38:05Z]
+Prompt: Looking good, merge PR #21 and list next issues.
+Response: Merged PR #21 into main (closes #4), synced local main, listed unblocked open issues.
