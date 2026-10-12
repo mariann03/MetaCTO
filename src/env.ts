@@ -5,14 +5,16 @@ import { z } from "zod";
 const modelId = <const P extends readonly [string, ...string[]]>(
   providers: P,
 ) => z.templateLiteral([z.enum(providers), ":", z.string().min(1)]);
-const languageModelId = modelId(["anthropic", "openai"]);
-const embeddingModelId = modelId(["openai", "voyage"]);
+const languageModelId = modelId(["ollama", "anthropic", "openai"]);
+const embeddingModelId = modelId(["ollama", "openai", "voyage"]);
 
 const envSchema = z.object({
   DATABASE_URL: z.url(),
-  INTAKE_MODEL: languageModelId.default("anthropic:claude-haiku-5-5"),
-  REASONING_MODEL: languageModelId.default("anthropic:claude-sonnet-5-5"),
-  EMBEDDING_MODEL: embeddingModelId.default("voyage:voyage-4"),
+  // Local Ollama models by default; hosted providers are one env change away.
+  INTAKE_MODEL: languageModelId.default("ollama:gemma4:12b"),
+  REASONING_MODEL: languageModelId.default("ollama:qwen3.6:27b"),
+  EMBEDDING_MODEL: embeddingModelId.default("ollama:bge-m3"),
+  OLLAMA_BASE_URL: z.url().default("http://localhost:11434"),
   /** Playwright only: swap every model for the deterministic fake. */
   E2E_FAKE_AI: z.literal("1").optional(),
 });

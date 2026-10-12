@@ -5,6 +5,7 @@ import {
   type EmbeddingModel,
   type LanguageModel,
 } from "ai";
+import { createOllama } from "ai-sdk-ollama";
 import { voyage } from "voyage-ai-provider";
 import type { Env } from "@/env";
 
@@ -18,12 +19,20 @@ export interface Models {
 }
 
 export function createModels(
-  ids: Pick<Env, "INTAKE_MODEL" | "REASONING_MODEL" | "EMBEDDING_MODEL">,
+  config: Pick<
+    Env,
+    "INTAKE_MODEL" | "REASONING_MODEL" | "EMBEDDING_MODEL" | "OLLAMA_BASE_URL"
+  >,
 ): Models {
-  const registry = createProviderRegistry({ anthropic, openai, voyage });
+  const registry = createProviderRegistry({
+    ollama: createOllama({ baseURL: config.OLLAMA_BASE_URL }),
+    anthropic,
+    openai,
+    voyage,
+  });
   return {
-    intake: registry.languageModel(ids.INTAKE_MODEL),
-    reasoning: registry.languageModel(ids.REASONING_MODEL),
-    embedding: registry.embeddingModel(ids.EMBEDDING_MODEL),
+    intake: registry.languageModel(config.INTAKE_MODEL),
+    reasoning: registry.languageModel(config.REASONING_MODEL),
+    embedding: registry.embeddingModel(config.EMBEDDING_MODEL),
   };
 }

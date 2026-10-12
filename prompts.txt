@@ -206,3 +206,23 @@ Response: Enabled noUncheckedIndexedAccess/noImplicitOverride/noFallthroughCases
 [2026-10-12T05:44:11Z]
 Prompt: yes (commit and push TS best-practice fixes to PR #20)
 Response: Committed and pushed to PR #20.
+
+
+[2026-10-12T05:49:31Z]
+Prompt: Looks good; to get things moving, start with local models.
+Response: No runtime installed (M3 Pro, 36 GB). User chose Ollama + ai-sdk-ollama, gemma4:12b (intake) + qwen3.6:27b (reasoning), bge-m3 embeddings. Installing Ollama via brew, pulling models, wiring provider.
+
+
+[2026-10-12T06:14:17Z]
+Prompt: Switch to the official Ollama app to fix structured output (Homebrew build lacks libollama_xgrammar for MLX engine -> 501 on format).
+Response: Stopped/uninstalled brew formula, installed ollama-app cask, verified structured output and ran smoke test.
+
+
+[2026-10-12T06:18:44Z]
+Prompt: Reasoning level per operation: off except the brief.
+Response: Recorded in docs/design.md (reasoning none for intake/clarify/statements/scoring/drafts; brief agent provider default) with measured latencies and the Ollama app requirement. Checks green; not committed.
+
+
+[2026-10-12T06:25:02Z]
+Prompt: Commit local-model changes on this same branch (PR #20).
+Response: Committed and pushed to feat/2-3-walking-skeleton-dataset (PR #20).
