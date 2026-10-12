@@ -244,7 +244,8 @@ export async function listMyRequests({ db }: DbDeps, userId: number) {
       >`case when ${isDraft} then 'draft' else ${requests.status} end`,
       createdAt: requests.createdAt,
       canSplit: sql<boolean>`${canSplit}`,
-      splitRequested: sql<boolean>`${requests.splitRequestedAt} is not null`,
+      // Disputed and still awaiting the PM's review.
+      splitRequested: sql<boolean>`${requests.splitRequestedAt} is not null and ${requests.reviewedAt} is null`,
       problemId: problems.id,
       statement: problems.statement,
     })
@@ -262,11 +263,12 @@ export async function listMyRequests({ db }: DbDeps, userId: number) {
   }));
 }
 
-/** Grouped into an existing Problem and not yet disputed: the submitter may ask for a split. */
+/** Grouped into an existing Problem, not yet disputed nor reviewed by a PM: the submitter may ask for a split. */
 const canSplit = and(
   eq(requests.status, "submitted"),
   inArray(requests.tier, ["high", "medium"]),
   isNull(requests.splitRequestedAt),
+  isNull(requests.reviewedAt),
 );
 
 /** A plain draft, or one whose analysis run went stale (crashed before finishing). */
@@ -445,15 +447,8 @@ async function createProblemFromRequest(
     )
       return attach(tx, deps, request, analyzed, meanwhile, "medium");
 
-    const [problem] = await tx
-      .insert(problems)
-      .values({ statement })
-      .returning({ id: problems.id });
-    if (!problem) throw new Error("Problem was not created");
+    const problem = { id: await insertProblem(tx, statement) };
     await markSubmitted(tx, deps, request, analyzed, problem.id, "low");
-    await tx
-      .insert(problemVersions)
-      .values({ problemId: problem.id, statement, author: "ai" });
     await tx.insert(events).values({
       type: "problem_created",
       actor: "ai",
@@ -469,6 +464,19 @@ async function createProblemFromRequest(
       tier: "low",
     };
   });
+}
+
+/** Inserts a Problem whose first version is a statement intake extracted (so AI-written); returns its id. */
+export async function insertProblem(tx: Tx, statement: string) {
+  const [problem] = await tx
+    .insert(problems)
+    .values({ statement })
+    .returning({ id: problems.id });
+  if (!problem) throw new Error("Problem was not created");
+  await tx
+    .insert(problemVersions)
+    .values({ problemId: problem.id, statement, author: "ai" });
+  return problem.id;
 }
 
 /** Groups the request into an existing Problem; the author's support joins it. */
@@ -543,7 +551,7 @@ async function markSubmitted(
  * Folds a new request into the Problem's statement as a new AI version.
  * Best effort: a locked statement, "no change" or a failed call keeps the current one.
  */
-async function refineStatement(
+export async function refineStatement(
   { db, models }: Deps,
   problemId: number,
   request: RequestText,

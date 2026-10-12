@@ -9,6 +9,7 @@ import {
   type SubmitResult,
   submitRequest,
 } from "@/domain/intake";
+import { reviewRequest } from "@/domain/review";
 import { MATCH_MODES, setMatchMode } from "@/domain/settings";
 import { deps } from "@/server/deps";
 import { getSession, USER_COOKIE } from "@/server/session";
@@ -112,6 +113,41 @@ export async function setMatchModeAction(
   await setMatchMode(deps, { mode, userId: user.id });
   revalidatePath("/settings");
   return { status: "saved" };
+}
+
+const reviewInput = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("accept") }),
+  z.object({ action: z.literal("split") }),
+  z.object({
+    action: z.literal("move"),
+    problemId: z.coerce.number().int().positive(),
+  }),
+]);
+
+export interface ReviewState {
+  status: "idle" | "reviewed" | "already_reviewed" | "invalid" | "forbidden";
+}
+
+export async function reviewRequestAction(
+  requestId: number,
+  _prev: ReviewState,
+  form: FormData,
+): Promise<ReviewState> {
+  const user = await currentUser();
+  if (user.role !== "pm") return { status: "forbidden" };
+  const decision = reviewInput.safeParse({
+    action: form.get("action"),
+    problemId: form.get("problemId"),
+  });
+  if (!decision.success) return { status: "invalid" };
+  const status = await reviewRequest(deps, {
+    userId: user.id,
+    requestId: z.number().int().positive().parse(requestId),
+    decision: decision.data,
+  });
+  revalidatePath("/review");
+  revalidatePath("/my-requests");
+  return { status };
 }
 
 async function currentUser() {

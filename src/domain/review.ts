@@ -1,0 +1,262 @@
+import {
+  and,
+  asc,
+  eq,
+  inArray,
+  isNotNull,
+  isNull,
+  notExists,
+  or,
+  sql,
+} from "drizzle-orm";
+import type { Tx } from "@/db/client";
+import { events, problems, requests, supports } from "@/db/schema";
+import type { DbDeps, Deps } from "./deps";
+import { requirePm } from "./directory";
+import { insertProblem, refineStatement } from "./intake";
+
+/**
+ * What a PM reviews: groupings the AI was unsure about (medium), the starts of new Problems
+ * (low), and groupings their submitter disputed; each until a PM accepts, moves or splits it.
+ */
+const needsReview = and(
+  eq(requests.status, "submitted"),
+  isNull(requests.reviewedAt),
+  or(
+    inArray(requests.tier, ["medium", "low"]),
+    isNotNull(requests.splitRequestedAt),
+  ),
+);
+
+/** Why an item is in the queue. */
+export type ReviewReason = "split_requested" | "new_problem" | "grouping";
+
+/** The review queue, oldest first, with the evidence intake decided on. */
+export async function listReviewQueue({ db }: DbDeps) {
+  const rows = await db
+    .select({
+      id: requests.id,
+      title: requests.title,
+      description: requests.description,
+      tier: requests.tier,
+      analysis: requests.analysis,
+      splitRequested: sql<boolean>`${requests.splitRequestedAt} is not null`,
+      problemId: problems.id,
+      statement: problems.statement,
+    })
+    .from(requests)
+    .innerJoin(problems, eq(requests.problemId, problems.id))
+    .where(needsReview)
+    .orderBy(asc(requests.createdAt), asc(requests.id));
+
+  // Candidates are shown with their current statements; ones merged away since are left out.
+  const candidateIds = [
+    ...new Set(
+      rows.flatMap((r) => r.analysis?.candidates.map((c) => c.problemId) ?? []),
+    ),
+  ];
+  const statements = new Map(
+    candidateIds.length === 0
+      ? []
+      : (
+          await db
+            .select({ id: problems.id, statement: problems.statement })
+            .from(problems)
+            .where(inArray(problems.id, candidateIds))
+        ).map((p) => [p.id, p.statement]),
+  );
+
+  return rows.map(({ problemId, statement, analysis, tier, ...request }) => {
+    const match = analysis?.match ?? null;
+    const candidates = (analysis?.candidates ?? []).flatMap((c) => {
+      const current = statements.get(c.problemId);
+      return current === undefined ? [] : [{ ...c, statement: current }];
+    });
+    const named = analysis?.candidates.find(
+      (c) => c.problemId === match?.problemId,
+    );
+    const reason: ReviewReason = request.splitRequested
+      ? "split_requested"
+      : tier === "low"
+        ? "new_problem"
+        : "grouping";
+    return {
+      id: request.id,
+      title: request.title,
+      description: request.description,
+      reason,
+      problem: { id: problemId, statement },
+      match,
+      // The model says same, but the similarity is below the review threshold.
+      signalsDisagree:
+        match?.verdict === "same_problem" &&
+        named !== undefined &&
+        analysis !== null &&
+        named.similarity < analysis.thresholds.low,
+      candidates,
+    };
+  });
+}
+
+export type ReviewItem = Awaited<ReturnType<typeof listReviewQueue>>[number];
+
+export type ProblemOption = Awaited<ReturnType<typeof listProblems>>[number];
+
+/** Every Problem, for choosing where to move a request. */
+export async function listProblems({ db }: DbDeps) {
+  return db
+    .select({ id: problems.id, statement: problems.statement })
+    .from(problems)
+    .orderBy(asc(problems.id));
+}
+
+/** accept: the AI's placement stands; move: into another Problem; split: into a new Problem. */
+export type ReviewDecision =
+  | { action: "accept" }
+  | { action: "move"; problemId: number }
+  | { action: "split" };
+
+/**
+ * A PM's review of one queue item. Accepting a medium grouping folds the request into the
+ * Problem's statement, as a high-tier attach does; moving and splitting are overrides.
+ * An item already reviewed (e.g. by another PM) is left as it is; a decision that does not
+ * fit it (moving into its own or a missing Problem, splitting a new Problem) changes nothing.
+ */
+export async function reviewRequest(
+  deps: Deps,
+  {
+    userId,
+    requestId,
+    decision,
+  }: { userId: number; requestId: number; decision: ReviewDecision },
+): Promise<"reviewed" | "already_reviewed" | "invalid"> {
+  await requirePm(deps, userId, "review requests");
+  const outcome = await deps.db.transaction(async (tx) => {
+    // Locked until commit: a concurrent review waits, then finds it reviewed.
+    const [request] = await tx
+      .select()
+      .from(requests)
+      .where(and(eq(requests.id, requestId), needsReview))
+      .for("update");
+    if (!request) return "already_reviewed" as const;
+    const from = request.problemId;
+    if (from === null) throw new Error(`Request ${requestId} has no Problem`);
+    // A new Problem is already the request's own; a move needs another, existing Problem.
+    if (decision.action === "split" && request.tier === "low")
+      return "invalid" as const;
+    if (decision.action === "move") {
+      if (decision.problemId === from) return "invalid" as const;
+      // Key share: the target cannot be deleted before this review commits.
+      const [target] = await tx
+        .select({ id: problems.id })
+        .from(problems)
+        .where(eq(problems.id, decision.problemId))
+        .for("key share");
+      if (!target) return "invalid" as const;
+    }
+
+    await tx
+      .update(requests)
+      .set({ reviewedAt: sql`now()` })
+      .where(eq(requests.id, requestId));
+    const record = (
+      type: string,
+      entity: { type: string; id: number },
+      payload: Record<string, unknown>,
+    ) =>
+      tx.insert(events).values({
+        type,
+        actor: "pm",
+        actorId: userId,
+        entityType: entity.type,
+        entityId: entity.id,
+        payload,
+      });
+
+    if (decision.action === "accept") {
+      await record(
+        "review_accepted",
+        { type: "request", id: requestId },
+        { problemId: from },
+      );
+      return { request, problemId: from };
+    }
+    let to: number;
+    if (decision.action === "move") to = decision.problemId;
+    else {
+      if (!request.analysis)
+        throw new Error(`Request ${requestId} has no analysis`);
+      to = await insertProblem(tx, request.analysis.problemStatement);
+      await record(
+        "problem_created",
+        { type: "problem", id: to },
+        { requestId },
+      );
+    }
+    await reassign(tx, request, from, to);
+    await record(
+      "grouping_overridden",
+      { type: "request", id: requestId },
+      { action: decision.action, fromProblemId: from, toProblemId: to },
+    );
+    return { request, problemId: to };
+  });
+  if (typeof outcome === "string") return outcome;
+  // Accepting confirms the grouping: only now may a medium one change the statement.
+  if (decision.action === "accept" && outcome.request.tier === "medium")
+    await refineStatement(deps, outcome.problemId, outcome.request);
+  return "reviewed";
+}
+
+/**
+ * Moves a request, and the author's support that came with it, into another Problem.
+ * The author still supports the old Problem through another of their requests there, if any;
+ * a Problem left without requests or supporters is deleted.
+ */
+async function reassign(
+  tx: Tx,
+  request: { id: number; authorId: number },
+  from: number,
+  to: number,
+) {
+  await tx
+    .update(requests)
+    .set({ problemId: to })
+    .where(eq(requests.id, request.id));
+  const [remaining] = await tx
+    .select({ id: requests.id })
+    .from(requests)
+    .where(
+      and(
+        eq(requests.problemId, from),
+        eq(requests.authorId, request.authorId),
+      ),
+    )
+    .limit(1);
+  if (remaining)
+    await tx
+      .update(supports)
+      .set({ requestId: remaining.id })
+      .where(eq(supports.requestId, request.id));
+  else await tx.delete(supports).where(eq(supports.requestId, request.id));
+  await tx
+    .insert(supports)
+    .values({ problemId: to, userId: request.authorId, requestId: request.id })
+    .onConflictDoNothing();
+
+  // ponytail: a submission grouped into `from` at this same instant fails and its request
+  // becomes a draft to resubmit; lock the Problem row in intake's attach if that matters.
+  await tx
+    .delete(problems)
+    .where(
+      and(
+        eq(problems.id, from),
+        notExists(
+          tx.select().from(requests).where(eq(requests.problemId, from)),
+        ),
+        notExists(
+          tx.select().from(supports).where(eq(supports.problemId, from)),
+        ),
+      ),
+    );
+}

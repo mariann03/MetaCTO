@@ -135,6 +135,8 @@ export const requests = pgTable(
     tier: matchTier("tier"),
     // Set when the submitter says the grouping is wrong ("Not the same? Split it out").
     splitRequestedAt: timestamp("split_requested_at", { withTimezone: true }),
+    // Set when a PM accepts, moves or splits it; the review queue holds the rest it needs.
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
     createdAt: createdAt(),
   },
   (t) => [
