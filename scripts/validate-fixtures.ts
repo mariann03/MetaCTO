@@ -1,6 +1,7 @@
 // Validates data/fixtures. Run: bun scripts/validate-fixtures.ts
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { role, segment } from "@/db/schema";
 
 const DIR = join(import.meta.dir, "..", "data", "fixtures");
 const errors: string[] = [];
@@ -76,7 +77,9 @@ for (const [name, list] of [
 }
 
 // Field shapes
-const SEGMENTS = ["smb", "mid_market", "enterprise"];
+// Enum values come from the schema so this check cannot drift from the tables.
+const SEGMENTS: readonly string[] = segment.enumValues;
+const ROLES: readonly string[] = role.enumValues;
 for (const a of accounts) {
   check(SEGMENTS.includes(a.segment), `${a.key}: bad segment ${a.segment}`);
   check(Number.isInteger(a.arr) && a.arr > 0, `${a.key}: bad arr`);
@@ -91,7 +94,7 @@ const accountByKey = new Map(accounts.map((a) => [a.key, a]));
 const userByKey = new Map(users.map((u) => [u.key, u]));
 const problemKeys = new Set(problems.map((p) => p.key));
 for (const u of users) {
-  check(["submitter", "pm"].includes(u.role), `${u.key}: bad role`);
+  check(ROLES.includes(u.role), `${u.key}: bad role`);
   if (u.accountKey !== null)
     check(
       accountByKey.has(u.accountKey),

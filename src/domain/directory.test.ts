@@ -70,7 +70,7 @@ beforeAll(async () => {
   deps = { db };
 });
 beforeEach(() => resetDatabase(db));
-afterAll(() => db.$client.end());
+afterAll(() => db?.$client.end());
 
 describe("directory", () => {
   test("seeded users are listed with their account, submitters before PMs", async () => {
@@ -121,6 +121,20 @@ describe("directory", () => {
       parseDirectoryFixtures({
         ...fixtures,
         users: [{ key: "u-09", role: "pm", accountKey: null }],
+      }),
+    ).toThrow();
+    // A misspelled key must fail instead of silently falling back to the default.
+    const { churnRisk, ...account } = fixtures.accounts[0];
+    expect(() =>
+      parseDirectoryFixtures({
+        ...fixtures,
+        accounts: [{ ...account, churnrisk: churnRisk }],
+      }),
+    ).toThrow();
+    expect(() =>
+      parseDirectoryFixtures({
+        ...fixtures,
+        users: [{ key: "u-09", name: "P", role: "pm", accountKey: "acc-01" }],
       }),
     ).toThrow();
   });

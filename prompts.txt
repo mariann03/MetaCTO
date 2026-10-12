@@ -176,3 +176,18 @@ Response: Confirmed the review already ran (two-axis, before commit, fixes in PR
 [2026-10-12T04:53:58Z]
 Prompt: Run typescript-advanced-types skill and evaluate drizzle-zod (skip re-review); then apply both TS fixes and drizzle-zod 0.8.3.
 Response: Ran skill via npx skills use; findings: model-id casts, unvalidated fixture JSON, hand-written fixture types. Evaluated drizzle-zod (0.8.3 compatible; moves to drizzle-orm/zod in v1). Applied: drizzle-zod fixture schemas derived from tables + parseDirectoryFixtures (TDD test), loader validates, z.templateLiteral model ids removing casts. All checks green; pushed to PR #20.
+
+
+[2026-10-12T04:57:17Z]
+Prompt: install it (typescript-advanced-types skill)
+Response: Installed wshobson/agents@typescript-advanced-types at project level for Claude Code (.claude/skills, skills-lock.json); scanned for scripts/risky patterns. Not committed.
+
+
+[2026-10-12T05:06:17Z]
+Prompt: /code-review xhigh --fix (run by user in background on PR #20 + working tree).
+Response: Review found 15 issues, fixed 12 (font var self-reference, session queried DB at build, strict fixture schema + required churnRisk + PM-no-account + arr>0, test admin URL/cleanup, per-tier provider validation, drizzle.config empty-string fallback, codePointAt in fake embedding, guarded afterAll, enum-derived validator lists). Left: cookie stores DB id (design), batched seed inserts. Verified checks; not committed.
+
+
+[2026-10-12T05:07:41Z]
+Prompt: Keep db id in role-switcher cookie; commit review fixes and typescript-advanced-types skill to PR #20.
+Response: Committed review fixes and the skill as two commits; pushed to PR #20.

@@ -11,16 +11,18 @@ export const TEST_DATABASE_URL =
 export async function prepareDatabase(url: string) {
   const target = new URL(url);
   const name = target.pathname.slice(1);
-  const admin = new Client({
-    connectionString: url.replace(/\/[^/]+$/, "/postgres"),
-  });
+  target.pathname = "/postgres";
+  const admin = new Client({ connectionString: target.toString() });
   await admin.connect();
-  const { rowCount } = await admin.query(
-    "select 1 from pg_database where datname = $1",
-    [name],
-  );
-  if (!rowCount) await admin.query(`create database "${name}"`);
-  await admin.end();
+  try {
+    const { rowCount } = await admin.query(
+      "select 1 from pg_database where datname = $1",
+      [name],
+    );
+    if (!rowCount) await admin.query(`create database "${name}"`);
+  } finally {
+    await admin.end();
+  }
 
   const db = createDb(url);
   await migrate(db, { migrationsFolder: "drizzle" });

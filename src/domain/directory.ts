@@ -6,12 +6,21 @@ import type { Deps } from "./deps";
 
 // Fixture shapes are derived from the tables, so a schema change can't drift
 // silently from the seed data. Users reference accounts by fixture key.
-const directoryFixturesSchema = z.object({
-  accounts: z.array(createInsertSchema(accounts)),
+// Strict objects: a misspelled key is an error, not a silently applied default.
+const directoryFixturesSchema = z.strictObject({
+  accounts: z.array(
+    createInsertSchema(accounts, { arr: (s) => s.positive() })
+      .required({ churnRisk: true })
+      .strict(),
+  ),
   users: z.array(
     createInsertSchema(users)
       .omit({ accountId: true })
-      .extend({ accountKey: z.string().nullable() }),
+      .extend({ accountKey: z.string().min(1).nullable() })
+      .strict()
+      .refine((u) => u.role !== "pm" || u.accountKey === null, {
+        message: "PM users cannot belong to an account",
+      }),
   ),
   strategy: z.string(),
 });

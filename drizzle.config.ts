@@ -6,6 +6,6 @@ export default defineConfig({
   out: "./drizzle",
   // Migrations use Neon's direct (non -pooler) URL; locally both are the same.
   dbCredentials: {
-    url: process.env.DATABASE_URL_UNPOOLED ?? process.env.DATABASE_URL ?? "",
+    url: process.env.DATABASE_URL_UNPOOLED || process.env.DATABASE_URL || "",
   },
 });
