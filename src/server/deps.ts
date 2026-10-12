@@ -13,9 +13,11 @@ function createDeps(): Deps {
   };
 }
 
-const globalForDeps = globalThis as unknown as { deps?: Deps };
+declare global {
+  // One pool per server process; survives module reloads in dev.
+  var appDeps: Deps | undefined;
+}
 
-// One pool per server process; reused across hot reloads in dev.
-globalForDeps.deps ??= createDeps();
+globalThis.appDeps ??= createDeps();
 
-export const deps: Deps = globalForDeps.deps;
+export const deps: Deps = globalThis.appDeps;

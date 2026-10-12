@@ -4,15 +4,17 @@ import {
   beforeEach,
   describe,
   expect,
+  expectTypeOf,
   test,
 } from "bun:test";
 import type { Db } from "@/db/client";
+import type { segment } from "@/db/schema";
 import {
   prepareDatabase,
   resetDatabase,
   TEST_DATABASE_URL,
 } from "../../test/db";
-import type { Deps } from "./deps";
+import type { DbDeps } from "./deps";
 import {
   type DirectoryFixtures,
   getStrategy,
@@ -21,15 +23,17 @@ import {
   seedDirectory,
 } from "./directory";
 
+const brightside = {
+  key: "acc-01",
+  name: "Brightside Bakery",
+  segment: "smb",
+  arr: 4800,
+  churnRisk: true,
+} satisfies DirectoryFixtures["accounts"][number];
+
 const fixtures = {
   accounts: [
-    {
-      key: "acc-01",
-      name: "Brightside Bakery",
-      segment: "smb",
-      arr: 4800,
-      churnRisk: true,
-    },
+    brightside,
     {
       key: "acc-02",
       name: "Northwind Logistics",
@@ -63,7 +67,7 @@ const fixtures = {
 } satisfies DirectoryFixtures;
 
 let db: Db;
-let deps: Pick<Deps, "db">;
+let deps: DbDeps;
 
 beforeAll(async () => {
   db = await prepareDatabase(TEST_DATABASE_URL);
@@ -114,7 +118,7 @@ describe("directory", () => {
     expect(() =>
       parseDirectoryFixtures({
         ...fixtures,
-        accounts: [{ ...fixtures.accounts[0], segment: "startup" }],
+        accounts: [{ ...brightside, segment: "startup" }],
       }),
     ).toThrow();
     expect(() =>
@@ -124,7 +128,7 @@ describe("directory", () => {
       }),
     ).toThrow();
     // A misspelled key must fail instead of silently falling back to the default.
-    const { churnRisk, ...account } = fixtures.accounts[0];
+    const { churnRisk, ...account } = brightside;
     expect(() =>
       parseDirectoryFixtures({
         ...fixtures,
@@ -141,5 +145,14 @@ describe("directory", () => {
 
   test("strategy is empty before anything is seeded", async () => {
     expect(await getStrategy(deps)).toBe("");
+  });
+
+  test("fixture types are derived from the tables", () => {
+    expectTypeOf<
+      DirectoryFixtures["accounts"][number]["segment"]
+    >().toEqualTypeOf<(typeof segment.enumValues)[number]>();
+    expectTypeOf<DirectoryFixtures["users"][number]["role"]>().toEqualTypeOf<
+      "submitter" | "pm"
+    >();
   });
 });

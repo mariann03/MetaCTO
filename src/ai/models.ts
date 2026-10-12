@@ -8,13 +8,14 @@ import {
 import { voyage } from "voyage-ai-provider";
 import type { Env } from "@/env";
 
-export type Models = {
+/** The three model tiers every AI-backed domain operation draws from. */
+export interface Models {
   /** Fast tier: intake analysis, statement updates, update drafts. */
   intake: LanguageModel;
   /** Reasoning tier: scoring and the decision brief agent. */
   reasoning: LanguageModel;
   embedding: EmbeddingModel;
-};
+}
 
 export function createModels(
   ids: Pick<Env, "INTAKE_MODEL" | "REASONING_MODEL" | "EMBEDDING_MODEL">,

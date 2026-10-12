@@ -10,4 +10,5 @@ export function createDb(connectionString: string) {
   return drizzle({ client: pool, schema });
 }
 
+/** Drizzle client bound to the app schema; `$client` is the underlying pg Pool. */
 export type Db = ReturnType<typeof createDb>;

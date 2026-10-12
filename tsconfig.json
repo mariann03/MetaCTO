@@ -21,7 +21,10 @@
     "paths": {
       "@/*": ["./src/*"]
     },
-    "types": ["node", "bun"]
+    "types": ["node", "bun"],
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true
   },
   "include": [
     "next-env.d.ts",

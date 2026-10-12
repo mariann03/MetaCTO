@@ -191,3 +191,18 @@ Response: Review found 15 issues, fixed 12 (font var self-reference, session que
 [2026-10-12T05:07:41Z]
 Prompt: Keep db id in role-switcher cookie; commit review fixes and typescript-advanced-types skill to PR #20.
 Response: Committed review fixes and the skill as two commits; pushed to PR #20.
+
+
+[2026-10-12T05:10:05Z]
+Prompt: Check again the 10 TypeScript best practices from the typescript-advanced-types skill.
+Response: Audited code against all 10; reported findings (type aliases for object shapes, JSON.parse any in validator, missing const assertion on TAGS, assertions in validator/deps, missing JSDoc, no type tests, strict-only tsconfig) and asked which fixes to apply.
+
+
+[2026-10-12T05:20:32Z]
+Prompt: Apply TS best-practice fixes: code fixes (1,2,5,6,7,8), type tests (10), stricter tsconfig (9).
+Response: Enabled noUncheckedIndexedAccess/noImplicitOverride/noFallthroughCasesInSwitch; validator parses unknown JSON via Zod reusing exported account/user fixture schemas, TAGS as const + Tag type; interfaces for Models/Deps; DbDeps helper; instanceof instead of cast; declare global for deps singleton; JSDoc on exported types; env + fixture type tests (expectTypeOf, @ts-expect-error), verified they fail on mutation. All checks green; not committed.
+
+
+[2026-10-12T05:44:11Z]
+Prompt: yes (commit and push TS best-practice fixes to PR #20)
+Response: Committed and pushed to PR #20.

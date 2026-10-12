@@ -17,9 +17,12 @@ const envSchema = z.object({
   E2E_FAKE_AI: z.literal("1").optional(),
 });
 
+/** Validated runtime configuration; model ids are typed `provider:model` strings. */
 export type Env = z.infer<typeof envSchema>;
 
 /** Parse once at each composition root so misconfiguration fails fast and loud. */
-export function readEnv(source: NodeJS.ProcessEnv = process.env): Env {
+export function readEnv(
+  source: Record<string, string | undefined> = process.env,
+): Env {
   return envSchema.parse(source);
 }

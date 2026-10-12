@@ -2,29 +2,32 @@ import { asc, eq, sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { accounts, settings, users } from "@/db/schema";
-import type { Deps } from "./deps";
+import type { DbDeps } from "./deps";
 
 // Fixture shapes are derived from the tables, so a schema change can't drift
 // silently from the seed data. Users reference accounts by fixture key.
 // Strict objects: a misspelled key is an error, not a silently applied default.
+export const accountFixtureSchema = createInsertSchema(accounts, {
+  arr: (s) => s.positive(),
+})
+  .required({ churnRisk: true })
+  .strict();
+
+export const userFixtureSchema = createInsertSchema(users)
+  .omit({ accountId: true })
+  .extend({ accountKey: z.string().min(1).nullable() })
+  .strict()
+  .refine((u) => u.role !== "pm" || u.accountKey === null, {
+    message: "PM users cannot belong to an account",
+  });
+
 const directoryFixturesSchema = z.strictObject({
-  accounts: z.array(
-    createInsertSchema(accounts, { arr: (s) => s.positive() })
-      .required({ churnRisk: true })
-      .strict(),
-  ),
-  users: z.array(
-    createInsertSchema(users)
-      .omit({ accountId: true })
-      .extend({ accountKey: z.string().min(1).nullable() })
-      .strict()
-      .refine((u) => u.role !== "pm" || u.accountKey === null, {
-        message: "PM users cannot belong to an account",
-      }),
-  ),
+  accounts: z.array(accountFixtureSchema),
+  users: z.array(userFixtureSchema),
   strategy: z.string(),
 });
 
+/** Seed input: accounts, users (referencing accounts by fixture key) and the strategy document. */
 export type DirectoryFixtures = z.infer<typeof directoryFixturesSchema>;
 
 /** Validates raw fixture data (e.g. parsed JSON files) before seeding. */
@@ -36,7 +39,7 @@ const STRATEGY_KEY = "strategy";
 
 /** Loads accounts, users and the strategy document; safe to run repeatedly. */
 export async function seedDirectory(
-  { db }: Pick<Deps, "db">,
+  { db }: DbDeps,
   fixtures: DirectoryFixtures,
 ) {
   await db.transaction(async (tx) => {
@@ -81,7 +84,7 @@ export async function seedDirectory(
   });
 }
 
-export async function listUsers({ db }: Pick<Deps, "db">) {
+export async function listUsers({ db }: DbDeps) {
   const rows = await db
     .select({
       id: users.id,
@@ -104,9 +107,10 @@ export async function listUsers({ db }: Pick<Deps, "db">) {
   }));
 }
 
+/** A user as listed by the role switcher: id, name, role and their account (null for staff and PMs). */
 export type DirectoryUser = Awaited<ReturnType<typeof listUsers>>[number];
 
-export async function getStrategy({ db }: Pick<Deps, "db">): Promise<string> {
+export async function getStrategy({ db }: DbDeps): Promise<string> {
   const [row] = await db
     .select({ value: settings.value })
     .from(settings)
