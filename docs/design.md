@@ -36,7 +36,7 @@ Scores, decisions, briefs and notifications hang off the Problem.
 
 ### Failure handling
 
-No queue, no cron. Analysis retries automatically 2–3 times. If it still fails, the Request is kept as a **draft** visible only in the author's "My requests" (not public, no support counted, not in the PM queue) with "Submit again", and the user sees an error suggesting they retry later.
+No queue, no cron. While a run analyzes a request its status is `analyzing` (shown as such in My requests, with no resubmit); a run older than 5 minutes counts as crashed and the request is a draft again. Each attempt has a 1-minute timeout. Analysis retries automatically 2–3 times. If it still fails, the Request is kept as a **draft** visible only in the author's "My requests" (not public, no support counted, not in the PM queue) with "Submit again", and the user sees an error suggesting they retry later.
 
 ### Concurrent duplicates
 

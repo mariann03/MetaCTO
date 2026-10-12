@@ -246,3 +246,28 @@ Response: Replaced Playwright webServer timeout 180_000 with ms("3m"); scanned c
 [2026-10-12T07:00:11Z]
 Prompt: Push the ms change to the PR and merge the branch.
 Response: Committed and pushed ms change, merged PR #20 into main (merge commit), closing #2 and #3; synced local main.
+
+
+[2026-10-12T07:01:32Z]
+Prompt: /mattpocock-skills:implement #4 (submit request -> new Problem with draft fallback).
+Response: Implemented #4 on feat/4-submit-request (TDD): schema problems/problem_versions/requests/supports + migration; intake service (embed, top-k candidate retrieval, structured extraction with reasoning none, 3 attempts, draft fallback, AI statement version, implicit support, events, per-user hourly rate limit on submission attempts incl. resubmits, escaped prompt delimiters, draft-only conditional submit); Submit page + My requests with Submit again; deterministic fake intake model for E2E. Verified with real local Ollama models. Two-axis review fixes applied. 24 unit + 3 E2E green.
+
+
+[2026-10-12T07:18:40Z]
+Prompt: yes (push #4 branch and open PR)
+Response: Pushed feat/4-submit-request and opened PR into main closing #4.
+
+
+[2026-10-12T07:32:28Z]
+Prompt: /code-review xhigh --fix on feat/4-submit-request.
+Response: Reviewed the #4 diff (10 angles + sweep). Fixed: submit form keeps typed text after validation/rate-limit refusals (fields echoed back, defaultValue + maxLength); per-attempt 1m timeout on embed + intake calls; empty problem statement fails analysis; embedding dimension guard; candidates ranked by max similarity per Problem (relaxed_order); rate-limit window on DB clock; fake flaky failures tied to ANALYSIS_ATTEMPTS. Added unit + E2E tests. Skipped: in-flight request shown as Draft/Submit again and thrown resubmit errors (needs a status/result design), retry re-embedding, schema->domain type import. 25 unit + 4 E2E green; not committed.
+
+
+[2026-10-12T07:34:38Z]
+Prompt: Finding #2: add an analyzing status (recommended); then commit review fixes and push to PR #21.
+Response: Committed review fixes; added analyzing request status (TDD): atomic draft->analyzing claim on resubmit, stale runs (>5 min) count as drafts, failures return to draft, My requests shows Analyzing with no button, analyzing outcome message; migration 0003; design doc updated. 28 unit + 4 E2E green; pushed to PR #21.
+
+
+[2026-10-12T07:38:05Z]
+Prompt: Looking good, merge PR #21 and list next issues.
+Response: Merged PR #21 into main (closes #4), synced local main, listed unblocked open issues.

@@ -15,6 +15,20 @@
       "when": 1791778690250,
       "tag": "0001_init",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791788590968,
+      "tag": "0002_problems_requests",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791790538412,
+      "tag": "0003_request_analyzing_status",
+      "breakpoints": true
     }
   ]
 }

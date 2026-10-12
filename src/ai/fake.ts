@@ -1,14 +1,14 @@
 import { MockEmbeddingModelV4, MockLanguageModelV4 } from "ai/test";
+import { EMBEDDING_DIMENSIONS } from "@/db/schema";
+import { ANALYSIS_ATTEMPTS } from "@/domain/intake";
 import type { Models } from "./models";
-
-export const FAKE_EMBEDDING_DIMENSIONS = 1024;
 
 // Same text always maps to the same unit vector, so similarity is reproducible.
 export function fakeEmbedding(text: string): number[] {
   let seed = 2166136261;
   for (const ch of text)
     seed = Math.imul(seed ^ (ch.codePointAt(0) ?? 0), 16777619);
-  const vector = Array.from({ length: FAKE_EMBEDDING_DIMENSIONS }, () => {
+  const vector = Array.from({ length: EMBEDDING_DIMENSIONS }, () => {
     seed = Math.imul(seed ^ (seed >>> 15), 2246822507) >>> 0;
     return seed / 2 ** 32 - 0.5;
   });
@@ -16,13 +16,54 @@ export function fakeEmbedding(text: string): number[] {
   return vector.map((v) => v / norm);
 }
 
+type Generate = MockLanguageModelV4["doGenerate"];
+
+/** A language-model response carrying `value` as JSON text, as structured output expects. */
+export function jsonResult(value: unknown): Awaited<ReturnType<Generate>> {
+  return {
+    content: [{ type: "text", text: JSON.stringify(value) }],
+    finishReason: { unified: "stop", raw: undefined },
+    usage: {
+      inputTokens: {
+        total: 10,
+        noCache: 10,
+        cacheRead: undefined,
+        cacheWrite: undefined,
+      },
+      outputTokens: { total: 10, text: 10, reasoning: undefined },
+    },
+    warnings: [],
+  };
+}
+
+// Analysis attempts per "[flaky]" title: the first submission exhausts its retries,
+// the resubmission succeeds, so E2E can exercise the draft path.
+const flakyAttempts = new Map<string, number>();
+
+/** Deterministic intake analysis derived from the request title in the prompt. */
+const fakeGenerate: Generate = async ({ prompt }) => {
+  const title =
+    /<title>([\s\S]*?)<\/title>/.exec(JSON.stringify(prompt))?.[1] ?? "";
+  if (title.includes("[flaky]")) {
+    const attempts = (flakyAttempts.get(title) ?? 0) + 1;
+    flakyAttempts.set(title, attempts);
+    if (attempts <= ANALYSIS_ATTEMPTS) throw new Error("Fake analysis failure");
+  }
+  const need = title.replace("[flaky]", "").trim();
+  return jsonResult({
+    problemStatement: `Customers need ${need}.`,
+    underlyingProblem: need,
+    proposedSolution: "",
+    persona: "Customer",
+    severity: "medium",
+  });
+};
+
 export function createFakeModels(): Models {
   const language = new MockLanguageModelV4({
     provider: "fake",
     modelId: "fake-language",
-    doGenerate: async () => {
-      throw new Error("Fake language model has no scripted response yet");
-    },
+    doGenerate: fakeGenerate,
   });
   return {
     intake: language,
