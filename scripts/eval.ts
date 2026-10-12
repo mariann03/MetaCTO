@@ -20,7 +20,7 @@ import type { MatchMode } from "@/domain/settings";
 import { readEnv } from "@/env";
 
 const env = readEnv();
-const { models, save } = createCachedModels(env);
+const { models, save } = createCachedModels(env, "eval");
 const fixtures = await loadRequestFixtures();
 
 let observations: Observation[];
@@ -31,6 +31,7 @@ try {
       console.log(`Replayed ${done}/${total} requests`);
     }
   });
+  save({ complete: true });
 } finally {
   save();
 }

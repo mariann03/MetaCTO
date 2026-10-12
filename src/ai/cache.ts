@@ -72,20 +72,44 @@ export function withResponseCache(
   };
 }
 
-/** A store backed by a JSON file; call `save()` to write new entries back. */
-export function fileStore(path: string): ResponseStore & { save(): void } {
-  const entries: Record<string, unknown> = existsSync(path)
+/**
+ * A store backed by a JSON file that several runs share (a run is a script and its models).
+ * Each run records the entries it used; `save({ complete: true })` after a full run drops
+ * the entries that run used before but no longer does, unless another run still needs them.
+ */
+export function fileStore(
+  path: string,
+  run: string,
+): ResponseStore & { save(options?: { complete?: boolean }): void } {
+  const file: {
+    runs: Record<string, string[]>;
+    entries: Record<string, unknown>;
+  } = existsSync(path)
     ? JSON.parse(readFileSync(path, "utf8"))
-    : {};
+    : { runs: {}, entries: {} };
+  const used = new Set<string>();
   let dirty = false;
   return {
-    get: (key) => entries[key],
+    get: (key) => {
+      const hit = file.entries[key];
+      if (hit !== undefined) used.add(key);
+      return hit;
+    },
     set: (key, value) => {
-      entries[key] = value;
+      file.entries[key] = value;
+      used.add(key);
       dirty = true;
     },
-    save: () => {
-      if (dirty) writeFileSync(path, `${JSON.stringify(entries)}\n`);
+    save: ({ complete = false } = {}) => {
+      if (complete) {
+        const previous = file.runs[run] ?? [];
+        file.runs[run] = [...used].sort();
+        const needed = new Set(Object.values(file.runs).flat());
+        for (const key of previous)
+          if (!needed.has(key)) delete file.entries[key];
+        dirty = true;
+      }
+      if (dirty) writeFileSync(path, `${JSON.stringify(file)}\n`);
       dirty = false;
     },
   };

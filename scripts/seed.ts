@@ -10,7 +10,7 @@ import { readEnv } from "@/env";
 
 const env = readEnv();
 const db = createDb(env.DATABASE_URL);
-const { models, save } = createCachedModels(env);
+const { models, save } = createCachedModels(env, "seed");
 try {
   await resetDatabase(db);
   await seedDirectory({ db }, await loadDirectoryFixtures());
@@ -24,6 +24,7 @@ try {
       }
     },
   );
+  save({ complete: true });
   console.log("Seed complete:", summary);
 } finally {
   save();

@@ -1,7 +1,10 @@
 import { describe, expect, test } from "bun:test";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { embed, generateText } from "ai";
 import { MockEmbeddingModelV4, MockLanguageModelV4 } from "ai/test";
-import { type ResponseStore, withResponseCache } from "./cache";
+import { fileStore, type ResponseStore, withResponseCache } from "./cache";
 import { jsonResult } from "./fake";
 
 /** In-memory store; `dump` is what a file-backed store would write to disk. */
@@ -96,5 +99,39 @@ describe("withResponseCache", () => {
       "test",
       "emb",
     ]);
+  });
+});
+
+describe("fileStore", () => {
+  test("a completed run drops the entries it no longer uses, unless another run needs them", () => {
+    const path = join(mkdtempSync(join(tmpdir(), "cache-")), "cache.json");
+    /** One script run: reads `keys` (writing the missing ones), then completes. */
+    const run = (name: string, keys: string[]) => {
+      const store = fileStore(path, name);
+      for (const key of keys) if (!store.get(key)) store.set(key, key);
+      store.save({ complete: true });
+    };
+
+    run("seed", ["shared", "old-seed"]);
+    run("eval", ["shared", "eval"]);
+    run("seed", ["seed"]);
+
+    const store = fileStore(path, "any");
+    expect(
+      ["shared", "old-seed", "eval", "seed"].map((k) => store.get(k)),
+    ).toEqual(["shared", undefined, "eval", "seed"]);
+  });
+
+  test("an interrupted run keeps every entry", () => {
+    const path = join(mkdtempSync(join(tmpdir(), "cache-")), "cache.json");
+    const first = fileStore(path, "seed");
+    first.set("a", 1);
+    first.save({ complete: true });
+    const interrupted = fileStore(path, "seed");
+    interrupted.set("b", 2);
+    interrupted.save();
+
+    const store = fileStore(path, "seed");
+    expect([store.get("a"), store.get("b")]).toEqual([1, 2]);
   });
 });
