@@ -16,6 +16,7 @@ export async function SiteHeader() {
           {current?.role === "pm" && (
             <>
               <Link href="/review">Review</Link>
+              <Link href="/priorities">Priorities</Link>
               <Link href="/settings">Settings</Link>
             </>
           )}
