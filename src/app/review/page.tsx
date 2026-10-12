@@ -18,10 +18,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { Verdict } from "@/domain/intake";
+import { listProblems, type ProblemSummary } from "@/domain/problems";
 import {
-  listProblems,
   listReviewQueue,
-  type ProblemOption,
   type ReviewItem,
   type ReviewReason,
 } from "@/domain/review";
@@ -66,7 +65,7 @@ async function Queue() {
 
   const [queue, problems] = await Promise.all([
     listReviewQueue(deps),
-    listProblems(deps),
+    listProblems(deps, current.id),
   ]);
   if (queue.length === 0)
     return <p className="text-muted-foreground">Nothing to review.</p>;
@@ -94,7 +93,7 @@ function QueueItem({
   problems,
 }: {
   item: ReviewItem;
-  problems: ProblemOption[];
+  problems: ProblemSummary[];
 }) {
   const { match } = item;
   return (

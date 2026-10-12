@@ -799,7 +799,7 @@ function candidatesMarkup(candidates: OfferedCandidate[]) {
 }
 
 /** Problems whose submitted requests are closest to the embedding, best match per Problem. */
-async function findCandidates(
+export async function findCandidates(
   tx: Tx,
   embedding: number[],
   excludeProblemIds: number[] = [],

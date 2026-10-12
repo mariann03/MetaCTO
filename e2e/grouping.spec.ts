@@ -4,6 +4,7 @@ async function submit(page: Page, title: string, description: string) {
   await page.goto("/submit");
   await page.getByLabel("Title").fill(title);
   await page.getByLabel("What do you need, and why?").fill(description);
+  await page.getByRole("button", { name: "Next" }).click();
   await page.getByRole("button", { name: "Submit request" }).click();
 }
 

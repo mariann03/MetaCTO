@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { ProblemOption } from "@/domain/review";
+import type { ProblemSummary } from "@/domain/problems";
 
 const idle: ReviewState = { status: "idle" };
 
@@ -27,7 +27,7 @@ export function ReviewActions({
 }: {
   requestId: number;
   canSplit: boolean;
-  problems: ProblemOption[];
+  problems: Pick<ProblemSummary, "id" | "statement">[];
   currentProblemId: number;
   suggestedIds: number[];
 }) {

@@ -1,0 +1,1 @@
+ALTER TABLE "supports" ADD COLUMN "note" text;

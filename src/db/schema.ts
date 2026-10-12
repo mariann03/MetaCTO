@@ -161,6 +161,8 @@ export const supports = pgTable(
       .references(() => users.id),
     // Set when the support came from submitting a request.
     requestId: refColumn("request_id").references(() => requests.id),
+    // "How does this affect you?" from a +1; evidence for the Problem.
+    note: text("note"),
     createdAt: createdAt(),
   },
   (t) => [

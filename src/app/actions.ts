@@ -9,6 +9,12 @@ import {
   type SubmitResult,
   submitRequest,
 } from "@/domain/intake";
+import {
+  addSupport,
+  findMatches,
+  SUPPORT_SOURCES,
+  type SupportSource,
+} from "@/domain/problems";
 import { reviewRequest } from "@/domain/review";
 import { MATCH_MODES, setMatchMode } from "@/domain/settings";
 import { deps } from "@/server/deps";
@@ -147,6 +153,48 @@ export async function reviewRequestAction(
   });
   revalidatePath("/review");
   revalidatePath("/my-requests");
+  return { status };
+}
+
+export type Match = Awaited<ReturnType<typeof findMatches>>[number];
+
+/** Problems resembling what the user is typing; embedding only, so it is cheap to call often. */
+export async function findMatchesAction(
+  title: string,
+  description: string,
+): Promise<Match[]> {
+  const user = await currentUser();
+  const text = z
+    .object({ title: z.string().max(200), description: z.string().max(5000) })
+    .parse({ title, description });
+  if (`${text.title}${text.description}`.trim() === "") return [];
+  return findMatches(deps, { viewerId: user.id, ...text });
+}
+
+export interface SupportState {
+  status: "idle" | "invalid" | Awaited<ReturnType<typeof addSupport>>;
+}
+
+export async function addSupportAction(
+  problemId: number,
+  source: SupportSource,
+  _prev: SupportState,
+  form: FormData,
+): Promise<SupportState> {
+  const user = await currentUser();
+  const note = z
+    .string()
+    .trim()
+    .max(1000)
+    .safeParse(String(form.get("note") ?? ""));
+  if (!note.success) return { status: "invalid" };
+  const status = await addSupport(deps, {
+    userId: user.id,
+    problemId: z.number().int().positive().parse(problemId),
+    note: note.data === "" ? null : note.data,
+    source: z.enum(SUPPORT_SOURCES).parse(source),
+  });
+  revalidatePath("/");
   return { status };
 }
 
