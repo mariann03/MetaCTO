@@ -17,11 +17,11 @@ import {
 import type { DbDeps } from "./deps";
 import {
   type DirectoryFixtures,
-  getStrategy,
   listUsers,
   parseDirectoryFixtures,
   seedDirectory,
 } from "./directory";
+import { getStrategy } from "./settings";
 
 const brightside = {
   key: "acc-01",

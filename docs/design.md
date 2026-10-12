@@ -55,9 +55,9 @@ LLM self-reported confidence is uncalibrated and not used. The tier is derived f
 | same_problem | T_low – T_high | Medium — attach + review |
 | related_but_different | any | Medium — attach + review |
 | same_problem | < T_low | Medium — review (signals disagree) |
-| different, or best similarity < T_low | any | Low — new Problem |
+| different, or no candidates | any | Low — new Problem (new Problems go to the review queue) |
 
-Thresholds are tuned on the training split so **high-tier precision ≥ 95%**, stored with the embedding model name. `matchMode: hybrid | similarity-only` (editable in UI) switches off the verdict; each mode has its own thresholds, and the eval reports both as an ablation.
+Rows are checked top to bottom. The creation lock re-checks only Problems created during the analysis; ones the model already judged keep its verdict. Only a high-tier attach refines the Problem statement; a medium one waits for the PM review, so uncertain evidence never rewrites it. Thresholds start provisional (hybrid 0.50/0.75, similarity-only 0.60/0.85; a real paraphrase scored 0.60 with bge-m3) and are tuned on the training split so **high-tier precision ≥ 95%**, stored with the embedding model name. `matchMode: hybrid | similarity-only` (editable in UI) switches off the verdict; each mode has its own thresholds, and the eval reports both as an ablation.
 
 ## Prioritization
 

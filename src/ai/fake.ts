@@ -42,20 +42,38 @@ const flakyAttempts = new Map<string, number>();
 
 /** Deterministic intake analysis derived from the request title in the prompt. */
 const fakeGenerate: Generate = async ({ prompt }) => {
-  const title =
-    /<title>([\s\S]*?)<\/title>/.exec(JSON.stringify(prompt))?.[1] ?? "";
+  const text = JSON.stringify(prompt);
+  // Statement refinement: the fake never has anything to add.
+  if (text.includes("<current_statement>"))
+    return jsonResult({ changed: false, statement: "" });
+
+  const title = /<title>([\s\S]*?)<\/title>/.exec(text)?.[1] ?? "";
   if (title.includes("[flaky]")) {
     const attempts = (flakyAttempts.get(title) ?? 0) + 1;
     flakyAttempts.set(title, attempts);
     if (attempts <= ANALYSIS_ATTEMPTS) throw new Error("Fake analysis failure");
   }
   const need = title.replace("[flaky]", "").trim();
+  const problemStatement = `Customers need ${need}.`;
+  // Asked for a verdict, the fake matches a candidate only if it states the same need.
+  const candidate = [
+    ...text.matchAll(/<candidate id=\\"(\d+)\\">(.*?)<\/candidate>/g),
+  ].find((m) => m[2] === problemStatement)?.[1];
+  // Not "<candidates>": the intake instructions mention that tag on every call.
+  const asked = text.includes("<candidate id=");
   return jsonResult({
-    problemStatement: `Customers need ${need}.`,
+    problemStatement,
     underlyingProblem: need,
     proposedSolution: "",
     persona: "Customer",
     severity: "medium",
+    match: asked
+      ? {
+          verdict: candidate ? "same_problem" : "different",
+          problemId: candidate ? Number(candidate) : null,
+          rationale: "Fake verdict",
+        }
+      : null,
   });
 };
 

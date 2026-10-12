@@ -15,40 +15,43 @@ export function SubmitForm() {
   const errors = state.status === "invalid" ? state.errors : {};
 
   return (
-    <form action={action} className="space-y-4">
-      <div className="space-y-2">
-        <Label htmlFor="title">Title</Label>
-        <Input
-          id="title"
-          name="title"
-          defaultValue={state.fields?.title}
-          maxLength={200}
-          aria-invalid={!!errors.title}
-          required
-        />
-        {errors.title && (
-          <p className="text-destructive text-sm">{errors.title[0]}</p>
-        )}
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="description">What do you need, and why?</Label>
-        <Textarea
-          id="description"
-          name="description"
-          rows={6}
-          defaultValue={state.fields?.description}
-          maxLength={5000}
-          aria-invalid={!!errors.description}
-          required
-        />
-        {errors.description && (
-          <p className="text-destructive text-sm">{errors.description[0]}</p>
-        )}
-      </div>
-      <Button type="submit" disabled={pending}>
-        {pending ? "Analyzing…" : "Submit request"}
-      </Button>
+    <div className="space-y-4">
+      <form action={action} className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="title">Title</Label>
+          <Input
+            id="title"
+            name="title"
+            defaultValue={state.fields?.title}
+            maxLength={200}
+            aria-invalid={!!errors.title}
+            required
+          />
+          {errors.title && (
+            <p className="text-destructive text-sm">{errors.title[0]}</p>
+          )}
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="description">What do you need, and why?</Label>
+          <Textarea
+            id="description"
+            name="description"
+            rows={6}
+            defaultValue={state.fields?.description}
+            maxLength={5000}
+            aria-invalid={!!errors.description}
+            required
+          />
+          {errors.description && (
+            <p className="text-destructive text-sm">{errors.description[0]}</p>
+          )}
+        </div>
+        <Button type="submit" disabled={pending}>
+          {pending ? "Analyzing…" : "Submit request"}
+        </Button>
+      </form>
+      {/* Outside the form: the result can hold its own form (split-out). */}
       <SubmitResultMessage state={state} />
-    </form>
+    </div>
   );
 }

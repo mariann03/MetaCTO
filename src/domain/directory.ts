@@ -1,8 +1,9 @@
 import { asc, eq, sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
-import { accounts, settings, users } from "@/db/schema";
+import { accounts, users } from "@/db/schema";
 import type { DbDeps } from "./deps";
+import { writeStrategy } from "./settings";
 
 // Fixture shapes are derived from the tables, so a schema change can't drift
 // silently from the seed data. Users reference accounts by fixture key.
@@ -35,8 +36,6 @@ export function parseDirectoryFixtures(raw: unknown): DirectoryFixtures {
   return directoryFixturesSchema.parse(raw);
 }
 
-const STRATEGY_KEY = "strategy";
-
 /** Loads accounts, users and the strategy document; safe to run repeatedly. */
 export async function seedDirectory(
   { db }: DbDeps,
@@ -66,13 +65,7 @@ export async function seedDirectory(
         .onConflictDoUpdate({ target: users.key, set: values });
     }
 
-    await tx
-      .insert(settings)
-      .values({ key: STRATEGY_KEY, value: fixtures.strategy })
-      .onConflictDoUpdate({
-        target: settings.key,
-        set: { value: fixtures.strategy },
-      });
+    await writeStrategy(tx, fixtures.strategy);
   });
 }
 
@@ -97,11 +90,3 @@ export async function listUsers({ db }: DbDeps) {
 
 /** A user as listed by the role switcher: id, name, role and their account (null for staff and PMs). */
 export type DirectoryUser = Awaited<ReturnType<typeof listUsers>>[number];
-
-export async function getStrategy({ db }: DbDeps): Promise<string> {
-  const [row] = await db
-    .select({ value: settings.value })
-    .from(settings)
-    .where(eq(settings.key, STRATEGY_KEY));
-  return typeof row?.value === "string" ? row.value : "";
-}

@@ -34,9 +34,9 @@ test("a request whose analysis fails is kept as a draft and can be submitted aga
     .fill("Our accountant needs the ledger in Excel every month.");
   await page.getByRole("button", { name: "Submit request" }).click();
 
-  await expect(page.locator("form").getByRole("alert")).toContainText(
-    "saved as a draft in My requests",
-  );
+  await expect(
+    page.getByRole("alert").filter({ hasText: "draft" }),
+  ).toContainText("saved as a draft in My requests");
 
   await page.goto("/my-requests");
   const draft = page

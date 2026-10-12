@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { SplitButton } from "@/components/split-button";
 import { Badge } from "@/components/ui/badge";
 import { listMyRequests } from "@/domain/intake";
 import { deps } from "@/server/deps";
@@ -49,6 +50,12 @@ async function RequestList() {
           )}
           {request.status === "draft" && (
             <ResubmitButton requestId={request.id} />
+          )}
+          {request.canSplit && <SplitButton requestId={request.id} />}
+          {request.splitRequested && (
+            <p className="text-muted-foreground text-sm">
+              Split requested. A product manager will review the grouping.
+            </p>
           )}
         </li>
       ))}

@@ -14,11 +14,14 @@ export function ResubmitButton({ requestId }: { requestId: number }) {
   );
 
   return (
-    <form action={action} className="space-y-2">
-      <Button type="submit" size="sm" variant="outline" disabled={pending}>
-        {pending ? "Analyzing…" : "Submit again"}
-      </Button>
+    <div className="space-y-2">
+      <form action={action} className="space-y-2">
+        <Button type="submit" size="sm" variant="outline" disabled={pending}>
+          {pending ? "Analyzing…" : "Submit again"}
+        </Button>
+      </form>
+      {/* Outside the form: the result can hold its own form (split-out). */}
       <SubmitResultMessage state={state} />
-    </form>
+    </div>
   );
 }

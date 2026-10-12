@@ -13,6 +13,7 @@ export async function SiteHeader() {
           <Link href="/">Explore</Link>
           <Link href="/submit">Submit</Link>
           <Link href="/my-requests">My requests</Link>
+          {current?.role === "pm" && <Link href="/settings">Settings</Link>}
         </nav>
         {current ? (
           <div className="flex items-center gap-2 text-muted-foreground text-sm">

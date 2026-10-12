@@ -4,10 +4,12 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { z } from "zod";
 import {
+  requestSplit,
   resubmitDraft,
   type SubmitResult,
   submitRequest,
 } from "@/domain/intake";
+import { MATCH_MODES, setMatchMode } from "@/domain/settings";
 import { deps } from "@/server/deps";
 import { getSession, USER_COOKIE } from "@/server/session";
 
@@ -78,6 +80,38 @@ export async function resubmitDraftAction(
   });
   revalidatePath("/my-requests");
   return result;
+}
+
+export interface SplitState {
+  status: "idle" | "requested";
+}
+
+export async function requestSplitAction(
+  requestId: number,
+  _prev: SplitState,
+): Promise<SplitState> {
+  const user = await currentUser();
+  await requestSplit(deps, {
+    userId: user.id,
+    requestId: z.number().int().positive().parse(requestId),
+  });
+  return { status: "requested" };
+}
+
+export interface MatchModeState {
+  status: "idle" | "saved" | "forbidden";
+}
+
+export async function setMatchModeAction(
+  _prev: MatchModeState,
+  form: FormData,
+): Promise<MatchModeState> {
+  const user = await currentUser();
+  if (user.role !== "pm") return { status: "forbidden" };
+  const mode = z.enum(MATCH_MODES).parse(form.get("mode"));
+  await setMatchMode(deps, { mode, userId: user.id });
+  revalidatePath("/settings");
+  return { status: "saved" };
 }
 
 async function currentUser() {
