@@ -15,6 +15,7 @@ import {
 } from "drizzle-orm";
 import ms from "ms";
 import { z } from "zod";
+import type { Models } from "@/ai/models";
 import type { Db, Tx } from "@/db/client";
 import {
   EMBEDDING_DIMENSIONS,
@@ -25,6 +26,7 @@ import {
   requests,
   supports,
 } from "@/db/schema";
+import tunedThresholds from "../../data/eval/thresholds.json";
 import type { DbDeps, Deps } from "./deps";
 import { getMatchMode, type MatchMode } from "./settings";
 
@@ -56,17 +58,37 @@ const extractionSchema = z.object({
 
 export type Tier = (typeof matchTier.enumValues)[number];
 
-// ponytail: provisional values from a manual bge-m3 check; the eval (#8) tunes them per embedding model.
 /** Similarity at or above `low` is worth a review; at or above `high` it may auto-group. */
 export interface Thresholds {
   low: number;
   high: number;
 }
 
-export const THRESHOLDS: Record<MatchMode, Thresholds> = {
+/** Used until `bun run eval` has tuned thresholds for the configured embedding model. */
+export const PROVISIONAL_THRESHOLDS: Record<MatchMode, Thresholds> = {
   hybrid: { low: 0.5, high: 0.75 },
   "similarity-only": { low: 0.6, high: 0.85 },
 };
+
+const thresholdsSchema = z.object({ low: z.number(), high: z.number() });
+// Written by `bun run eval`; keyed by embedding model, because similarity scales differ per model.
+const tuned = z
+  .record(
+    z.string(),
+    z.object({ hybrid: thresholdsSchema, "similarity-only": thresholdsSchema }),
+  )
+  .parse(tunedThresholds);
+
+/** Thresholds per matching mode for an embedding model, tuned by the eval when available. */
+export function thresholdsFor(embeddingModel: string): {
+  source: "tuned" | "provisional";
+  modes: Record<MatchMode, Thresholds>;
+} {
+  const modes = tuned[embeddingModel];
+  return modes
+    ? { source: "tuned", modes }
+    : { source: "provisional", modes: PROVISIONAL_THRESHOLDS };
+}
 
 const matchSchema = z.object({
   verdict: z
@@ -94,6 +116,8 @@ export interface Candidate {
 export type RequestAnalysis = z.infer<typeof extractionSchema> & {
   candidates: Candidate[];
   mode: MatchMode;
+  /** The thresholds the tier was decided with, for auditing and evaluation. */
+  thresholds: Thresholds;
   /** The model's verdict; null when it was not asked (no candidates, or similarity-only). */
   match: z.infer<typeof matchSchema> | null;
 };
@@ -330,13 +354,17 @@ type Analyzed = Awaited<ReturnType<typeof analyze>>;
 type Submitted = Extract<SubmitResult, { status: "submitted" }>;
 
 /** The tier table: where a request goes (null: a new Problem), given its candidates and the model's verdict. */
-function placeRequest({ candidates, match, mode }: RequestAnalysis): {
+export function placeRequest({
+  candidates,
+  match,
+  thresholds,
+}: Pick<RequestAnalysis, "candidates" | "match" | "thresholds">): {
   tier: Tier;
   candidate: Candidate | null;
 } {
   const best = candidates[0];
   if (!best) return { tier: "low", candidate: null };
-  const { low, high } = THRESHOLDS[mode];
+  const { low, high } = thresholds;
 
   if (!match) {
     if (best.similarity >= high) return { tier: "high", candidate: best };
@@ -346,7 +374,9 @@ function placeRequest({ candidates, match, mode }: RequestAnalysis): {
   // The model's "different" always starts a Problem; new Problems reach the PM review anyway.
   if (match.verdict === "different") return { tier: "low", candidate: null };
 
-  // analyze() guarantees the named Problem is one of the candidates.
+  // A match that names no Problem goes to review against the closest one; it never auto-groups.
+  if (match.problemId === null) return { tier: "medium", candidate: best };
+  // analyzeRequest() guarantees a named Problem is one of the candidates.
   const named = candidates.find((c) => c.problemId === match.problemId);
   if (!named) throw new Error(`Problem ${match.problemId} is not a candidate`);
   return {
@@ -363,10 +393,8 @@ function placeRequest({ candidates, match, mode }: RequestAnalysis): {
  * Without a verdict, similarity-only groups from its low threshold in sequence, so it does here too;
  * hybrid has no verdict on the new Problem, so only a confident similarity counts.
  */
-function lockMatchThreshold(mode: MatchMode) {
-  return mode === "similarity-only"
-    ? THRESHOLDS[mode].low
-    : THRESHOLDS[mode].high;
+function lockMatchThreshold({ mode, thresholds }: RequestAnalysis) {
+  return mode === "similarity-only" ? thresholds.low : thresholds.high;
 }
 
 /** Opens a new Problem for the request, unless a matching one appeared while it was analyzed. */
@@ -391,7 +419,7 @@ async function createProblemFromRequest(
     );
     if (
       meanwhile &&
-      meanwhile.similarity >= lockMatchThreshold(analyzed.analysis.mode)
+      meanwhile.similarity >= lockMatchThreshold(analyzed.analysis)
     )
       return attach(tx, deps, request, analyzed, meanwhile, "medium");
 
@@ -612,7 +640,7 @@ async function analyze(
   const abortSignal = AbortSignal.timeout(ATTEMPT_TIMEOUT);
   const { embedding } = await embed({
     model: models.embedding,
-    value: `${request.title}\n\n${request.description}`,
+    value: embeddingText(request),
     maxRetries: 0,
     abortSignal,
   });
@@ -623,13 +651,59 @@ async function analyze(
   const candidates = await db.transaction((tx) =>
     findCandidates(tx, embedding),
   );
-  const askVerdict = mode === "hybrid" && candidates.length > 0;
+  const { extraction, match } = await analyzeRequest(models, {
+    request,
+    candidates: await withStatements(db, candidates),
+    mode,
+    abortSignal,
+  });
+  const thresholds = thresholdsFor(modelName(models.embedding)).modes[mode];
+  const analysis: RequestAnalysis = {
+    ...extraction,
+    candidates,
+    mode,
+    thresholds,
+    match,
+  };
+  return { embedding, analysis };
+}
 
+/** The text a request is embedded from; the eval embeds fixtures the same way. */
+export function embeddingText(
+  request: Pick<RequestText, "title" | "description">,
+) {
+  return `${request.title}\n\n${request.description}`;
+}
+
+/** A candidate Problem as the model sees it: its id, similarity and current statement. */
+export interface OfferedCandidate extends Candidate {
+  statement: string;
+}
+
+/**
+ * The intake model call: extracts the underlying problem and, in hybrid mode with candidates,
+ * judges whether the request matches one. Pure model work, so the eval can replay it.
+ */
+export async function analyzeRequest(
+  models: Pick<Models, "intake">,
+  {
+    request,
+    candidates,
+    mode,
+    abortSignal,
+  }: {
+    request: Pick<RequestText, "title" | "description">;
+    candidates: OfferedCandidate[];
+    mode: MatchMode;
+    abortSignal?: AbortSignal;
+  },
+) {
+  const askVerdict = mode === "hybrid" && candidates.length > 0;
   const { output } = await generateText({
     model: models.intake,
     instructions: INTAKE_INSTRUCTIONS,
     prompt: askVerdict
-      ? `${requestMarkup(request)}\n${await candidatesMarkup(db, candidates)}`
+      ? `${requestMarkup(request)}\n${candidatesMarkup(candidates)}`
       : requestMarkup(request),
     output: Output.object({
       schema: askVerdict
@@ -649,25 +723,23 @@ async function analyze(
   // The model may only point at a Problem it was offered; anything else is a failed analysis.
   const offered = (id: number | null) =>
     candidates.some((c) => c.problemId === id);
-  if (
-    match &&
-    (match.verdict === "different"
-      ? match.problemId !== null && !offered(match.problemId)
-      : !offered(match.problemId))
-  )
+  if (match && match.problemId !== null && !offered(match.problemId))
     throw new Error(
       `Verdict names Problem ${match.problemId}, not a candidate`,
     );
-
-  const analysis: RequestAnalysis = { ...extraction, candidates, mode, match };
-  return { embedding, analysis };
+  return { extraction, match };
 }
 
-function requestMarkup(request: RequestText) {
+function requestMarkup(request: Pick<RequestText, "title" | "description">) {
   return `<request>\n<title>${escapeMarkup(request.title)}</title>\n<description>${escapeMarkup(request.description)}</description>\n</request>`;
 }
 
-async function candidatesMarkup(db: Db, candidates: Candidate[]) {
+/** Attaches each candidate's current statement, keeping the similarity order. */
+async function withStatements(
+  db: Db,
+  candidates: Candidate[],
+): Promise<OfferedCandidate[]> {
+  if (candidates.length === 0) return [];
   const rows = await db
     .select({ id: problems.id, statement: problems.statement })
     .from(problems)
@@ -678,10 +750,17 @@ async function candidatesMarkup(db: Db, candidates: Candidate[]) {
       ),
     );
   const statements = new Map(rows.map((p) => [p.id, p.statement]));
+  return candidates.map((c) => ({
+    ...c,
+    statement: statements.get(c.problemId) ?? "",
+  }));
+}
+
+function candidatesMarkup(candidates: OfferedCandidate[]) {
   // Most similar first, so the model reads candidates in ranking order.
   const items = candidates.map(
     (c) =>
-      `<candidate id="${c.problemId}">${escapeMarkup(statements.get(c.problemId) ?? "")}</candidate>`,
+      `<candidate id="${c.problemId}">${escapeMarkup(c.statement)}</candidate>`,
   );
   return `<candidates>\n${items.join("\n")}\n</candidates>`;
 }
@@ -725,7 +804,8 @@ async function findCandidates(
     .map(([problemId, similarity]): Candidate => ({ problemId, similarity }));
 }
 
-function modelName(model: EmbeddingModel) {
+/** `provider:model` name of an embedding model, as stored with each vector. */
+export function modelName(model: EmbeddingModel) {
   return typeof model === "string"
     ? model
     : `${model.provider}:${model.modelId}`;

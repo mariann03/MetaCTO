@@ -14,7 +14,9 @@
     "db:migrate": "drizzle-kit migrate",
     "fixtures:validate": "bun scripts/validate-fixtures.ts",
     "test:e2e": "playwright test",
-    "seed": "bun scripts/seed.ts"
+    "seed": "bun scripts/seed.ts",
+    "eval": "bun scripts/eval.ts",
+    "reembed": "bun scripts/reembed.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.78",

@@ -1,0 +1,12 @@
+{
+  "ollama:bge-m3": {
+    "hybrid": {
+      "low": 0.5,
+      "high": 0.75
+    },
+    "similarity-only": {
+      "low": 0.58,
+      "high": 0.85
+    }
+  }
+}

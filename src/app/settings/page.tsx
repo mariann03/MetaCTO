@@ -8,7 +8,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { THRESHOLDS } from "@/domain/intake";
+import { modelName, thresholdsFor } from "@/domain/intake";
 import { getMatchMode } from "@/domain/settings";
 import { deps } from "@/server/deps";
 import { getSession } from "@/server/session";
@@ -35,12 +35,18 @@ async function MatchingSettings() {
     );
 
   const mode = await getMatchMode(deps);
+  const embeddingModel = modelName(deps.models.embedding);
+  const { source, modes } = thresholdsFor(embeddingModel);
   return (
     <div className="space-y-4">
       <MatchModeForm mode={mode} />
       <Table>
         <TableCaption>
-          Thresholds in use (set by the evaluation, read-only)
+          Thresholds in use for {embeddingModel} (
+          {source === "tuned"
+            ? "tuned by the evaluation"
+            : "provisional, not yet evaluated"}
+          , read-only)
         </TableCaption>
         <TableHeader>
           <TableRow>
@@ -50,7 +56,7 @@ async function MatchingSettings() {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {Object.entries(THRESHOLDS).map(([name, t]) => (
+          {Object.entries(modes).map(([name, t]) => (
             <TableRow key={name}>
               <TableCell>{name}</TableCell>
               <TableCell>{t.low}</TableCell>

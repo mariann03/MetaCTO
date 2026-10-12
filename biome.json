@@ -14,7 +14,8 @@
       "!dist",
       "!build",
       "!drizzle",
-      "!.claude"
+      "!.claude",
+      "!data/cache"
     ]
   },
   "formatter": {

@@ -2,12 +2,16 @@ import { anthropic } from "@ai-sdk/anthropic";
 import { openai } from "@ai-sdk/openai";
 import {
   createProviderRegistry,
-  type EmbeddingModel,
-  type LanguageModel,
+  type wrapEmbeddingModel,
+  type wrapLanguageModel,
 } from "ai";
 import { createOllama } from "ai-sdk-ollama";
 import { voyage } from "voyage-ai-provider";
 import type { Env } from "@/env";
+
+// Model instances (not gateway id strings), so they can be wrapped with middleware.
+type LanguageModel = Parameters<typeof wrapLanguageModel>[0]["model"];
+type EmbeddingModel = Parameters<typeof wrapEmbeddingModel>[0]["model"];
 
 /** The three model tiers every AI-backed domain operation draws from. */
 export interface Models {

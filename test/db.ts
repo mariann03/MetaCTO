@@ -1,7 +1,8 @@
-import { sql } from "drizzle-orm";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { Client } from "pg";
-import { createDb, type Db } from "@/db/client";
+import { createDb } from "@/db/client";
+
+export { resetDatabase } from "@/db/reset";
 
 export const TEST_DATABASE_URL =
   process.env.TEST_DATABASE_URL ??
@@ -27,12 +28,4 @@ export async function prepareDatabase(url: string) {
   const db = createDb(url);
   await migrate(db, { migrationsFolder: "drizzle" });
   return db;
-}
-
-export async function resetDatabase(db: Db) {
-  const { rows } = await db.execute<{ tablename: string }>(
-    sql`select tablename from pg_tables where schemaname = 'public'`,
-  );
-  const tables = rows.map((r) => `"${r.tablename}"`).join(", ");
-  await db.execute(sql.raw(`truncate ${tables} restart identity cascade`));
 }

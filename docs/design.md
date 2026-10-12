@@ -108,7 +108,10 @@ Guardrail: **PM override rate** of AI merges, splits and scores. All computed in
 ## Data and evaluation
 
 - Synthetic B2B SaaS ("Ledgerly"-style finance/invoicing platform) fixtures, LLM-generated once, hand-reviewed, committed: `accounts.json` (~30), `problems.json` (~20 ground-truth labels, not loaded as Problems), `requests.json` (~150 with `problemKey`, including solution-shaped, paraphrased, ambiguous, vague, verbose and prompt-injection cases), `strategy.md`.
-- Seed runs requests through the real pipeline (cached fast path for `bun run seed`).
+- Seed runs requests through the real pipeline (`bun run seed`: reset, directory, then every fixture request via `submitRequest` in order).
+- Model responses are cached by AI SDK middleware in `data/cache/model-responses.json` (committed), keyed by model and request parameters, so seeding and the eval replay offline with no runtime or API keys.
+- The eval replays each request against the **ground-truth state** (the Problems earlier requests should have formed, each stated as intake stated its first request), records candidates, similarities and the verdict once, then scores any thresholds with the same `placeRequest` function intake uses. Tuning on train: `high` = lowest value with high-tier precision ≥ 95% (else never auto-group); similarity-only `low` = best F1 of grouping at high or medium; hybrid reviews by verdict, so its `low` is not tuned. Results go to `data/eval/latest.json`; thresholds to `data/eval/thresholds.json`, keyed by embedding model, which intake reads (provisional values otherwise).
+- `bun run reembed` re-embeds every request after switching `EMBEDDING_MODEL`; then re-run the eval for that model.
 - `bun run eval`: precision/recall per tier, both match modes, ~100 tuning / ~50 held-out split.
 - Stretch: eval-only dataset of 300–500 real OSS enhancement issues with duplicate markers as partial ground truth (precision reported as a lower bound), authors anonymized, never loaded into the demo DB.
 
