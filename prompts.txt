@@ -311,3 +311,7 @@ Response: Implemented #8 (TDD): AI SDK cache middleware with committed data/cach
 [2026-10-12T10:25:44Z]
 Prompt: Eval decisions: add a confidence guard to threshold tuning; open a follow-up issue for recall experiments.
 Response: Added Wilson lower-bound guard (falls back to provisional when evidence is thin, never if contradicted); re-ran eval from cache (hybrid 0.75 provisional, sim-only 0.58/0.85); opened #23 (recall experiments, blocked by #8); re-seeding.
+
+[2026-10-12T12:00:00Z]
+Prompt: push and open the PR
+Response: Ran the session-trailer check (clean), pushed feat/8-seed-eval and opened a PR closing #8.
