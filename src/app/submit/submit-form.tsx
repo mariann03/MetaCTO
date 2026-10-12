@@ -18,7 +18,14 @@ export function SubmitForm() {
     <form action={action} className="space-y-4">
       <div className="space-y-2">
         <Label htmlFor="title">Title</Label>
-        <Input id="title" name="title" aria-invalid={!!errors.title} required />
+        <Input
+          id="title"
+          name="title"
+          defaultValue={state.fields?.title}
+          maxLength={200}
+          aria-invalid={!!errors.title}
+          required
+        />
         {errors.title && (
           <p className="text-destructive text-sm">{errors.title[0]}</p>
         )}
@@ -29,6 +36,8 @@ export function SubmitForm() {
           id="description"
           name="description"
           rows={6}
+          defaultValue={state.fields?.description}
+          maxLength={5000}
           aria-invalid={!!errors.description}
           required
         />

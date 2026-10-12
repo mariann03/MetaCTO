@@ -1,5 +1,6 @@
 import { MockEmbeddingModelV4, MockLanguageModelV4 } from "ai/test";
 import { EMBEDDING_DIMENSIONS } from "@/db/schema";
+import { ANALYSIS_ATTEMPTS } from "@/domain/intake";
 import type { Models } from "./models";
 
 // Same text always maps to the same unit vector, so similarity is reproducible.
@@ -37,7 +38,6 @@ export function jsonResult(value: unknown): Awaited<ReturnType<Generate>> {
 
 // Analysis attempts per "[flaky]" title: the first submission exhausts its retries,
 // the resubmission succeeds, so E2E can exercise the draft path.
-const FLAKY_FAILURES = 3;
 const flakyAttempts = new Map<string, number>();
 
 /** Deterministic intake analysis derived from the request title in the prompt. */
@@ -47,7 +47,7 @@ const fakeGenerate: Generate = async ({ prompt }) => {
   if (title.includes("[flaky]")) {
     const attempts = (flakyAttempts.get(title) ?? 0) + 1;
     flakyAttempts.set(title, attempts);
-    if (attempts <= FLAKY_FAILURES) throw new Error("Fake analysis failure");
+    if (attempts <= ANALYSIS_ATTEMPTS) throw new Error("Fake analysis failure");
   }
   const need = title.replace("[flaky]", "").trim();
   return jsonResult({

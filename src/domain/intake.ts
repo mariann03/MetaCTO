@@ -14,6 +14,7 @@ import ms from "ms";
 import { z } from "zod";
 import type { Db } from "@/db/client";
 import {
+  EMBEDDING_DIMENSIONS,
   events,
   problems,
   problemVersions,
@@ -23,7 +24,9 @@ import {
 import type { DbDeps, Deps } from "./deps";
 
 export const SUBMISSIONS_PER_HOUR = 10;
-const ANALYSIS_ATTEMPTS = 3;
+export const ANALYSIS_ATTEMPTS = 3;
+// Bounds one attempt, so a hung model call fails over to the next attempt or the draft.
+const ATTEMPT_TIMEOUT = ms("1m");
 const CANDIDATE_COUNT = 3;
 // Requests fetched before grouping by Problem; enough to fill CANDIDATE_COUNT Problems.
 const CANDIDATE_REQUEST_POOL = 20;
@@ -31,6 +34,8 @@ const CANDIDATE_REQUEST_POOL = 20;
 const extractionSchema = z.object({
   problemStatement: z
     .string()
+    // A refinement, not minLength: some providers reject string constraints in schemas.
+    .refine((s) => s.trim() !== "", "The problem statement is empty.")
     .describe(
       "One sentence stating the user need in problem terms: who struggles with what, and why. Never name a solution or feature.",
     ),
@@ -153,7 +158,8 @@ async function isRateLimited(db: Db, userId: number) {
       and(
         eq(events.type, "request_submitted"),
         eq(events.actorId, userId),
-        gte(events.createdAt, new Date(Date.now() - ms("1h"))),
+        // The database clock, the same one that stamped the events.
+        gte(events.createdAt, sql`now() - interval '1 hour'`),
       ),
     );
   return (row?.n ?? 0) >= SUBMISSIONS_PER_HOUR;
@@ -258,11 +264,17 @@ async function createProblemFromRequest(
 
 async function analyze({ db, models }: Deps, request: RequestText) {
   // The pipeline retries as a whole, so the SDK's own retries are off.
+  const abortSignal = AbortSignal.timeout(ATTEMPT_TIMEOUT);
   const { embedding } = await embed({
     model: models.embedding,
     value: `${request.title}\n\n${request.description}`,
     maxRetries: 0,
+    abortSignal,
   });
+  if (embedding.length !== EMBEDDING_DIMENSIONS)
+    throw new Error(
+      `Embedding has ${embedding.length} dimensions, expected ${EMBEDDING_DIMENSIONS}`,
+    );
   const candidates = await findCandidates(db, embedding);
   const { output } = await generateText({
     model: models.intake,
@@ -271,6 +283,7 @@ async function analyze({ db, models }: Deps, request: RequestText) {
     output: Output.object({ schema: extractionSchema }),
     reasoning: "none",
     maxRetries: 0,
+    abortSignal,
   });
   return { embedding, analysis: { ...output, candidates } };
 }
@@ -294,11 +307,16 @@ async function findCandidates(db: Db, embedding: number[]) {
       .limit(CANDIDATE_REQUEST_POOL);
   });
 
+  // relaxed_order may return rows slightly out of order, so rank in code.
   const best = new Map<number, number>();
   for (const { problemId, similarity } of rows)
-    if (problemId !== null && !best.has(problemId))
+    if (
+      problemId !== null &&
+      similarity > (best.get(problemId) ?? Number.NEGATIVE_INFINITY)
+    )
       best.set(problemId, similarity);
   return [...best]
+    .sort((a, b) => b[1] - a[1])
     .slice(0, CANDIDATE_COUNT)
     .map(([problemId, similarity]): Candidate => ({ problemId, similarity }));
 }

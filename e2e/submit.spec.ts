@@ -49,3 +49,20 @@ test("a request whose analysis fails is kept as a draft and can be submitted aga
   await expect(draft).toContainText("Submitted");
   await expect(draft).toContainText("Problem: Customers need export to excel.");
 });
+
+test("a request that fails validation keeps what was typed", async ({
+  page,
+}) => {
+  await page.goto("/submit");
+  await page.getByLabel("Title").fill("csv export");
+  await page.getByLabel("What do you need, and why?").fill("too short");
+  await page.getByRole("button", { name: "Submit request" }).click();
+
+  await expect(
+    page.getByText("Describe what you need in a sentence or two."),
+  ).toBeVisible();
+  await expect(page.getByLabel("Title")).toHaveValue("csv export");
+  await expect(page.getByLabel("What do you need, and why?")).toHaveValue(
+    "too short",
+  );
+});

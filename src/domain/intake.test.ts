@@ -209,6 +209,20 @@ describe("submitRequest", () => {
     ]);
   });
 
+  test("treats an empty problem statement as a failed analysis", async () => {
+    const { models } = scriptedModels({
+      generate: async () => jsonResult({ ...analysis, problemStatement: " " }),
+    });
+
+    const result = await submitRequest(deps(models), {
+      authorId: alice,
+      ...request,
+    });
+
+    expect(result.status).toBe("draft");
+    expect(await db.select().from(problems)).toHaveLength(0);
+  });
+
   test("refuses submissions over the hourly limit without saving them", async () => {
     for (let i = 0; i < SUBMISSIONS_PER_HOUR; i++)
       await submitRequest(deps(), { authorId: alice, ...request });

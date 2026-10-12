@@ -35,20 +35,27 @@ const requestInput = z.object({
     .max(5000),
 });
 
-export type SubmitState =
+// React resets the form after every action, so text that was not saved is echoed back.
+export type SubmitState = (
   | { status: "idle" }
   | SubmitResult
-  | { status: "invalid"; errors: { title?: string[]; description?: string[] } };
+  | { status: "invalid"; errors: { title?: string[]; description?: string[] } }
+) & { fields?: z.input<typeof requestInput> };
 
 export async function submitRequestAction(
   _prev: SubmitState,
   form: FormData,
 ): Promise<SubmitState> {
-  const parsed = requestInput.safeParse(Object.fromEntries(form));
+  const fields = {
+    title: String(form.get("title") ?? ""),
+    description: String(form.get("description") ?? ""),
+  };
+  const parsed = requestInput.safeParse(fields);
   if (!parsed.success)
     return {
       status: "invalid",
       errors: z.flattenError(parsed.error).fieldErrors,
+      fields,
     };
 
   const user = await currentUser();
@@ -57,7 +64,7 @@ export async function submitRequestAction(
     ...parsed.data,
   });
   revalidatePath("/my-requests");
-  return result;
+  return result.status === "rate_limited" ? { ...result, fields } : result;
 }
 
 export async function resubmitDraftAction(
