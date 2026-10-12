@@ -1,8 +1,11 @@
 import { z } from "zod";
 
-const modelId = z
-  .string()
-  .regex(/^(anthropic|openai|voyage):.+$/, "expected provider:model");
+// `provider:model`, typed as a template literal so it feeds the registry without casts.
+const modelId = z.templateLiteral([
+  z.enum(["anthropic", "openai", "voyage"]),
+  ":",
+  z.string().min(1),
+]);
 
 const envSchema = z.object({
   DATABASE_URL: z.url(),

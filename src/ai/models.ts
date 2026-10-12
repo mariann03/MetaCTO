@@ -6,6 +6,7 @@ import {
   type LanguageModel,
 } from "ai";
 import { voyage } from "voyage-ai-provider";
+import type { Env } from "@/env";
 
 export type Models = {
   /** Fast tier: intake analysis, statement updates, update drafts. */
@@ -15,17 +16,13 @@ export type Models = {
   embedding: EmbeddingModel;
 };
 
-type ModelId = `${"anthropic" | "openai" | "voyage"}:${string}`;
-
-export function createModels(ids: {
-  INTAKE_MODEL: string;
-  REASONING_MODEL: string;
-  EMBEDDING_MODEL: string;
-}): Models {
+export function createModels(
+  ids: Pick<Env, "INTAKE_MODEL" | "REASONING_MODEL" | "EMBEDDING_MODEL">,
+): Models {
   const registry = createProviderRegistry({ anthropic, openai, voyage });
   return {
-    intake: registry.languageModel(ids.INTAKE_MODEL as ModelId),
-    reasoning: registry.languageModel(ids.REASONING_MODEL as ModelId),
-    embedding: registry.embeddingModel(ids.EMBEDDING_MODEL as ModelId),
+    intake: registry.languageModel(ids.INTAKE_MODEL),
+    reasoning: registry.languageModel(ids.REASONING_MODEL),
+    embedding: registry.embeddingModel(ids.EMBEDDING_MODEL),
   };
 }

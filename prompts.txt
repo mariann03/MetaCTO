@@ -166,3 +166,13 @@ Response: Implemented #2 (schema accounts/users/events/settings + migrations, do
 [2026-10-12T04:36:05Z]
 Prompt: create a PR
 Response: Remote was empty: pushed 7f9148a as main (PR base), pushed feat/2-3-walking-skeleton-dataset and opened a PR into main closing #2 and #3.
+
+
+[2026-10-12T04:51:15Z]
+Prompt: Asked whether /mattpocock-skills:code-review was already run; if not, first run `npx skills use wshobson/agents --skill typescript-advanced-types`, check drizzle-zod usefulness, then run the review.
+Response: Confirmed the review already ran (two-axis, before commit, fixes in PR #20); asked whether to still do the skill + drizzle-zod check + re-review on the PR.
+
+
+[2026-10-12T04:53:58Z]
+Prompt: Run typescript-advanced-types skill and evaluate drizzle-zod (skip re-review); then apply both TS fixes and drizzle-zod 0.8.3.
+Response: Ran skill via npx skills use; findings: model-id casts, unvalidated fixture JSON, hand-written fixture types. Evaluated drizzle-zod (0.8.3 compatible; moves to drizzle-orm/zod in v1). Applied: drizzle-zod fixture schemas derived from tables + parseDirectoryFixtures (TDD test), loader validates, z.templateLiteral model ids removing casts. All checks green; pushed to PR #20.

@@ -13,7 +13,13 @@ import {
   TEST_DATABASE_URL,
 } from "../../test/db";
 import type { Deps } from "./deps";
-import { getStrategy, listUsers, seedDirectory } from "./directory";
+import {
+  type DirectoryFixtures,
+  getStrategy,
+  listUsers,
+  parseDirectoryFixtures,
+  seedDirectory,
+} from "./directory";
 
 const fixtures = {
   accounts: [
@@ -54,7 +60,7 @@ const fixtures = {
     { key: "u-04", name: "Priya Shah", role: "pm", accountKey: null },
   ],
   strategy: "# Strategy\n\nMove upmarket.",
-} as const;
+} satisfies DirectoryFixtures;
 
 let db: Db;
 let deps: Pick<Deps, "db">;
@@ -101,6 +107,22 @@ describe("directory", () => {
     await seedDirectory(deps, fixtures);
 
     expect(await getStrategy(deps)).toBe("# Strategy\n\nMove upmarket.");
+  });
+
+  test("fixture files are validated before seeding", () => {
+    expect(parseDirectoryFixtures(fixtures)).toEqual(fixtures);
+    expect(() =>
+      parseDirectoryFixtures({
+        ...fixtures,
+        accounts: [{ ...fixtures.accounts[0], segment: "startup" }],
+      }),
+    ).toThrow();
+    expect(() =>
+      parseDirectoryFixtures({
+        ...fixtures,
+        users: [{ key: "u-09", role: "pm", accountKey: null }],
+      }),
+    ).toThrow();
   });
 
   test("strategy is empty before anything is seeded", async () => {

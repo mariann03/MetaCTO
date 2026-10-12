@@ -1,29 +1,27 @@
 import { asc, eq, sql } from "drizzle-orm";
-import {
-  accounts,
-  type role,
-  type segment,
-  settings,
-  users,
-} from "@/db/schema";
+import { createInsertSchema } from "drizzle-zod";
+import { z } from "zod";
+import { accounts, settings, users } from "@/db/schema";
 import type { Deps } from "./deps";
 
-export type DirectoryFixtures = {
-  accounts: readonly {
-    key: string;
-    name: string;
-    segment: (typeof segment.enumValues)[number];
-    arr: number;
-    churnRisk: boolean;
-  }[];
-  users: readonly {
-    key: string;
-    name: string;
-    role: (typeof role.enumValues)[number];
-    accountKey: string | null;
-  }[];
-  strategy: string;
-};
+// Fixture shapes are derived from the tables, so a schema change can't drift
+// silently from the seed data. Users reference accounts by fixture key.
+const directoryFixturesSchema = z.object({
+  accounts: z.array(createInsertSchema(accounts)),
+  users: z.array(
+    createInsertSchema(users)
+      .omit({ accountId: true })
+      .extend({ accountKey: z.string().nullable() }),
+  ),
+  strategy: z.string(),
+});
+
+export type DirectoryFixtures = z.infer<typeof directoryFixturesSchema>;
+
+/** Validates raw fixture data (e.g. parsed JSON files) before seeding. */
+export function parseDirectoryFixtures(raw: unknown): DirectoryFixtures {
+  return directoryFixturesSchema.parse(raw);
+}
 
 const STRATEGY_KEY = "strategy";
 
