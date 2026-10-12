@@ -161,3 +161,8 @@ Response: User approved 18-ticket breakdown and blockers. Published issues #2-#1
 [2026-10-12T04:17:01Z]
 Prompt: /mattpocock-skills:implement #2 and #3 (implement tickets with TDD at agreed seams, typecheck/test regularly, /code-review, commit).
 Response: Implemented #2 (schema accounts/users/events/settings + migrations, domain directory service with TDD tests on real test Postgres, provider registry + fake models, zod env, role switcher UI + Explore, seed script, Playwright 1.64.0 harness + role E2E) and #3 (Ledgerly fixtures + validator, via agent; rebalanced holdout tags). Ran two-axis code review, fixed env validation, seed script name, enum-derived types, Pick<Deps,"db">, $client, fake switch moved to composition root, per-split tag check, E2E account assertion. Lint/typecheck/4 unit/1 E2E green. Committed to master.
+
+
+[2026-10-12T04:36:05Z]
+Prompt: create a PR
+Response: Remote was empty: pushed 7f9148a as main (PR base), pushed feat/2-3-walking-skeleton-dataset and opened a PR into main closing #2 and #3.
