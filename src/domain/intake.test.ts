@@ -6,7 +6,7 @@ import {
   expect,
   test,
 } from "bun:test";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import {
   events,
@@ -47,6 +47,31 @@ const failingModels = () =>
       throw new Error("model unavailable");
     },
   });
+
+/** Models whose analysis waits until `release()` is called, to observe a run in progress. */
+const gatedModels = () => {
+  let release = () => {};
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const { models } = scriptedModels({
+    generate: async () => {
+      await gate;
+      return jsonResult(analysis);
+    },
+  });
+  return { models, release };
+};
+
+/** Waits until the author's request reaches `status` in My requests. */
+async function untilListed(userId: number, status: string) {
+  for (let i = 0; i < 100; i++) {
+    const mine = await listMyRequests({ db }, userId);
+    if (mine[0]?.status === status) return mine[0];
+    await Bun.sleep(10);
+  }
+  throw new Error(`request never reached ${status}`);
+}
 
 const request = {
   title: "  Zapier integration ",
@@ -351,13 +376,76 @@ describe("resubmitDraft", () => {
       resubmitDraft(deps(), { userId: alice, requestId: draft.requestId }),
     ]);
 
-    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    expect(results.every((r) => r.status === "fulfilled")).toBe(true);
     expect(await db.select().from(problems)).toHaveLength(1);
     expect(await db.select().from(supports)).toHaveLength(1);
+  });
+
+  test("a resubmit while the request is being analyzed reports it instead of starting again", async () => {
+    const draft = await submitRequest(deps(failingModels().models), {
+      authorId: alice,
+      ...request,
+    });
+    if (draft.status !== "draft") throw new Error("expected draft");
+    const gated = gatedModels();
+    const first = resubmitDraft(deps(gated.models), {
+      userId: alice,
+      requestId: draft.requestId,
+    });
+    await untilListed(alice, "analyzing");
+
+    const second = await resubmitDraft(deps(), {
+      userId: alice,
+      requestId: draft.requestId,
+    });
+    gated.release();
+
+    expect(second).toEqual({ status: "analyzing", requestId: draft.requestId });
+    expect((await first).status).toBe("submitted");
+    expect(await db.select().from(problems)).toHaveLength(1);
+  });
+
+  test("an analysis that never finished can be resubmitted after a while", async () => {
+    const draft = await submitRequest(deps(failingModels().models), {
+      authorId: alice,
+      ...request,
+    });
+    if (draft.status !== "draft") throw new Error("expected draft");
+    // Simulate a run that crashed mid-analysis ten minutes ago.
+    await db
+      .update(requests)
+      .set({
+        status: "analyzing",
+        analysisStartedAt: sql`now() - interval '10 minutes'`,
+      })
+      .where(eq(requests.id, draft.requestId));
+
+    expect((await listMyRequests({ db }, alice))[0]?.status).toBe("draft");
+    const result = await resubmitDraft(deps(), {
+      userId: alice,
+      requestId: draft.requestId,
+    });
+
+    expect(result.status).toBe("submitted");
   });
 });
 
 describe("listMyRequests", () => {
+  test("a request being analyzed is listed as analyzing, not as a draft", async () => {
+    const gated = gatedModels();
+    const pending = submitRequest(deps(gated.models), {
+      authorId: alice,
+      ...request,
+    });
+
+    const listed = await untilListed(alice, "analyzing");
+    gated.release();
+
+    expect(listed.problem).toBeNull();
+    expect((await pending).status).toBe("submitted");
+    expect((await listMyRequests({ db }, alice))[0]?.status).toBe("submitted");
+  });
+
   test("lists only the user's requests, newest first, with their Problem or draft state", async () => {
     await submitRequest(deps(failingModels().models), {
       authorId: alice,

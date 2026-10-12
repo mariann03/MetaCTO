@@ -29,7 +29,12 @@ export const problemStatus = pgEnum("problem_status", [
   "declined",
   "shipped",
 ]);
-export const requestStatus = pgEnum("request_status", ["draft", "submitted"]);
+// draft: saved but not analyzed; analyzing: a run holds it; submitted: grouped into a Problem.
+export const requestStatus = pgEnum("request_status", [
+  "draft",
+  "analyzing",
+  "submitted",
+]);
 
 const createdAt = () =>
   timestamp("created_at", { withTimezone: true }).notNull().defaultNow();
@@ -117,6 +122,8 @@ export const requests = pgTable(
     title: text("title").notNull(),
     description: text("description").notNull(),
     status: requestStatus("status").notNull().default("draft"),
+    // When the current analysis run claimed the request; old claims count as crashed runs.
+    analysisStartedAt: timestamp("analysis_started_at", { withTimezone: true }),
     embedding: vector("embedding", { dimensions: EMBEDDING_DIMENSIONS }),
     embeddingModel: text("embedding_model"),
     analysis: jsonb("analysis").$type<RequestAnalysis>(),

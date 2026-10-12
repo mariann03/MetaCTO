@@ -23,6 +23,12 @@ export function SubmitResultMessage({ state }: { state: SubmitState }) {
           ; please try again later.
         </p>
       );
+    case "analyzing":
+      return (
+        <p role="status" className="rounded-md border bg-muted p-3 text-sm">
+          This request is already being analyzed. Check back in a moment.
+        </p>
+      );
     case "rate_limited":
       return (
         <p
