@@ -281,3 +281,8 @@ Response: Implemented #6 (TDD): verdict (same/related/different + rationale) in 
 [2026-10-12T08:17:53Z]
 Prompt: Yes to both: add the medium-tier statement refinement to #10 and push/open the PR for #6.
 Response: Added acceptance criterion to #10 (accepting a medium grouping refines the statement); pushed feat/6-confidence-tiers and opened PR closing #6.
+
+
+[2026-10-12T08:24:40Z]
+Prompt: Use TanStack Table for complex tables (noted for later) and shadcn table components for every table.
+Response: Saved as a feedback memory; replaced the raw thresholds table on the Settings page with shadcn Table components; pushed to PR #22.
