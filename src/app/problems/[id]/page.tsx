@@ -58,7 +58,7 @@ async function ProblemDetail({
       <section className="space-y-2">
         <h2 className="font-semibold text-lg">Decision</h2>
         {/* Filled in once PMs record decisions with a public rationale. */}
-        <p className="text-muted-foreground">No decision yet.</p>
+        <p className="text-muted-foreground">No public rationale yet.</p>
       </section>
 
       <section className="space-y-2">

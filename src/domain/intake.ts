@@ -705,6 +705,7 @@ async function analyze(
 export function embeddingText(
   request: Pick<RequestText, "title" | "description">,
 ) {
+  // The E2E fake embedding reads the title back as the text before the blank line.
   return `${request.title}\n\n${request.description}`;
 }
 

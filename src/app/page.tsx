@@ -51,7 +51,7 @@ async function Explorer({
   const { q, status } = filtersSchema.parse(await searchParams);
   const list = q
     ? await searchProblems(deps, { viewerId: current.id, query: q, status })
-    : await listProblems(deps, current.id, status);
+    : await listProblems(deps, { viewerId: current.id, status });
 
   return (
     <div className="space-y-4">

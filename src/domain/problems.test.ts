@@ -309,7 +309,7 @@ describe("listProblems", () => {
       .set({ status: "planned" })
       .where(eq(problems.id, payroll));
 
-    expect(await listProblems(deps(db), people.bob)).toEqual([
+    expect(await listProblems(deps(db), { viewerId: people.bob })).toEqual([
       {
         id: receipts,
         statement: "Statement for Receipts",
@@ -326,7 +326,12 @@ describe("listProblems", () => {
       },
     ]);
     expect(
-      (await listProblems(deps(db), people.bob, "planned")).map((p) => p.id),
+      (
+        await listProblems(deps(db), {
+          viewerId: people.bob,
+          status: "planned",
+        })
+      ).map((p) => p.id),
     ).toEqual([payroll]);
   });
 });

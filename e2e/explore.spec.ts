@@ -17,7 +17,7 @@ test("a customer searches Explore, filters by status and opens a Problem", async
     statement,
   );
 
-  // Only planned Problems: the new one is still open.
+  // Planned hides the new Problem; Open (below) shows it again.
   await page.getByRole("combobox", { name: "Status" }).click();
   await page.getByRole("option", { name: "Planned" }).click();
   await page.getByRole("button", { name: "Search" }).click();
@@ -35,7 +35,7 @@ test("a customer searches Explore, filters by status and opens a Problem", async
   );
   await expect(problem.getByText("Open", { exact: true })).toBeVisible();
   await expect(problem.getByText("1 supporter")).toBeVisible();
-  await expect(problem.getByText("No decision yet.")).toBeVisible();
+  await expect(problem.getByText("No public rationale yet.")).toBeVisible();
   await expect(problem.getByText("No updates yet.")).toBeVisible();
   const request = problem.getByRole("listitem").filter({ hasText: need });
   // Anonymized: the customer's segment, never their name.

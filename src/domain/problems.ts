@@ -47,8 +47,7 @@ function problemSummaries(db: Db, viewerId: number, where?: SQL) {
 /** Every Problem, or those with one status, most supported first. */
 export async function listProblems(
   { db }: DbDeps,
-  viewerId: number,
-  status?: ProblemStatus,
+  { viewerId, status }: { viewerId: number; status?: ProblemStatus },
 ) {
   return problemSummaries(
     db,
@@ -169,7 +168,7 @@ export async function searchProblems(
   return rankedSummaries(db, viewerId, ranked);
 }
 
-/** Where a +1 came from: the submit page (instead of filing a request), or Explore. */
+/** Where a +1 came from: the submit page (instead of filing a request), or Explore (its list or a Problem page). */
 export const SUPPORT_SOURCES = ["submit", "explore"] as const;
 export type SupportSource = (typeof SUPPORT_SOURCES)[number];
 
