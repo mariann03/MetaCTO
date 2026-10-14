@@ -91,6 +91,18 @@ export async function listUsers({ db }: DbDeps) {
 /** A user as listed by the role switcher: id, name, role and their account (null for staff and PMs). */
 export type DirectoryUser = Awaited<ReturnType<typeof listUsers>>[number];
 
+/**
+ * Whether the user is on our team: a PM, or staff with no account (Sales, CS, Support).
+ * Our team may see what customers must not, such as requests naming accounts and ARR.
+ */
+export async function isOurTeam({ db }: DbDeps, userId: number) {
+  const [user] = await db
+    .select({ role: users.role, accountId: users.accountId })
+    .from(users)
+    .where(eq(users.id, userId));
+  return user !== undefined && (user.role === "pm" || user.accountId === null);
+}
+
 /** Throws unless the user is a PM; PM-only operations call it first. */
 export async function requirePm({ db }: DbDeps, userId: number, what: string) {
   const [user] = await db
