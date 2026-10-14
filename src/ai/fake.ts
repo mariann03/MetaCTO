@@ -47,6 +47,13 @@ const fakeGenerate: Generate = async ({ prompt }) => {
   if (text.includes("<current_statement>"))
     return jsonResult({ changed: false, statement: "" });
 
+  // Update drafts: the internal one is the only call shown the accounts.
+  if (text.includes("<decision>"))
+    return jsonResult({
+      body: text.includes("<accounts>")
+        ? "Fake internal update with talking points."
+        : "Fake update: we have decided on this problem.",
+    });
   // Scoring: middling scores citing the first request it was shown.
   if (text.includes("<strategy>")) {
     const first = Number(/<request id=\\"(\d+)\\"/.exec(text)?.[1]);

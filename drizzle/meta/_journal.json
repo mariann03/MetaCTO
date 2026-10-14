@@ -57,6 +57,13 @@
       "when": 1791942470931,
       "tag": "0007_scores",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791943725683,
+      "tag": "0008_decisions_updates",
+      "breakpoints": true
     }
   ]
 }

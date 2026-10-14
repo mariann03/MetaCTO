@@ -13,6 +13,7 @@ export async function SiteHeader() {
           <Link href="/">Explore</Link>
           <Link href="/submit">Submit</Link>
           <Link href="/my-requests">My requests</Link>
+          <Link href="/notifications">Notifications</Link>
           {current?.role === "pm" && (
             <>
               <Link href="/review">Review</Link>

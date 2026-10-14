@@ -175,6 +175,8 @@ describe("getProblem", () => {
       status: "open",
       supporters: 2,
       supported: false,
+      decision: null,
+      updates: [],
       requests: [
         {
           id: expect.any(Number),

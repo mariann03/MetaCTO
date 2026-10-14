@@ -7,19 +7,23 @@ import {
   desc,
   eq,
   inArray,
+  isNotNull,
   type SQL,
   sql,
 } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import {
   accounts,
+  decisions,
   events,
   problemStatus,
   problems,
   requests,
   supports,
+  updates,
   users,
 } from "@/db/schema";
+import { latestDecision } from "./decisions";
 import type { DbDeps, Deps } from "./deps";
 import { embeddingText, findCandidates } from "./intake";
 
@@ -61,7 +65,8 @@ export async function listProblems(
 export type ProblemSummary = Awaited<ReturnType<typeof listProblems>>[number];
 
 /**
- * A Problem as anyone may see it, with the requests behind it, oldest first. Requests are
+ * A Problem as anyone may see it: its latest decision, its approved customer updates and the
+ * requests behind it, oldest first. Requests are
  * anonymized: only the author's customer segment is shown, never who or which account.
  */
 export async function getProblem(
@@ -75,7 +80,7 @@ export async function getProblem(
     eq(problems.id, problemId),
   );
   if (!problem) return null;
-  const behind = await db
+  const requestsBehind = db
     .select({
       id: requests.id,
       title: requests.title,
@@ -89,7 +94,38 @@ export async function getProblem(
       and(eq(requests.problemId, problemId), eq(requests.status, "submitted")),
     )
     .orderBy(asc(requests.createdAt), asc(requests.id));
-  return { ...problem, requests: behind };
+  const decision = latestDecision(db, problemId);
+  // The public feed: approved customer updates, newest first.
+  const feed = db
+    .select({
+      id: updates.id,
+      body: updates.body,
+      approvedAt: updates.approvedAt,
+    })
+    .from(updates)
+    .innerJoin(decisions, eq(decisions.id, updates.decisionId))
+    .where(
+      and(
+        eq(decisions.problemId, problemId),
+        eq(updates.audience, "customer"),
+        isNotNull(updates.approvedAt),
+      ),
+    )
+    .orderBy(desc(updates.approvedAt), desc(updates.id));
+  const [behind, decided, published] = await Promise.all([
+    requestsBehind,
+    decision,
+    feed,
+  ]);
+  return {
+    ...problem,
+    decision: decided && {
+      status: decided.status,
+      rationale: decided.rationale,
+    },
+    requests: behind,
+    updates: published,
+  };
 }
 
 /** Summaries of ranked Problems, in their rank order, each with its similarity. */
