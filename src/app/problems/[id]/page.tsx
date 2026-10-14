@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { z } from "zod";
+import { BriefButton } from "@/components/brief-button";
 import { MergeForm, StatementForm } from "@/components/curation-controls";
 import {
   DecisionForm,
@@ -11,6 +12,7 @@ import { ProblemStatusBadge } from "@/components/problem-status";
 import { ScoreValue } from "@/components/score-value";
 import { OverrideForm, RescoreButton } from "@/components/scoring-controls";
 import { SupportButton } from "@/components/support-button";
+import { type Brief, getLatestBrief } from "@/domain/brief";
 import { isStatementLocked, listVersions } from "@/domain/curation";
 import {
   DECISIONS,
@@ -97,6 +99,8 @@ async function ProblemDetail({
 
       {current.role === "pm" && <Scores problemId={problem.id} />}
 
+      {current.role === "pm" && <DecisionBrief problemId={problem.id} />}
+
       <section aria-label="Decision" className="space-y-2">
         <h2 className="font-semibold text-lg">Decision</h2>
         {problem.decision ? (
@@ -159,7 +163,7 @@ async function ProblemDetail({
 async function Scores({ problemId }: { problemId: number }) {
   const judged = await getScores(deps, problemId);
   return (
-    <section aria-label="Scores" className="space-y-3">
+    <section id="scores" aria-label="Scores" className="space-y-3">
       <div className="flex items-center justify-between gap-4">
         <h2 className="font-semibold text-lg">Scores</h2>
         <RescoreButton problemId={problemId} />
@@ -304,6 +308,99 @@ async function Curation({
         </ol>
       </details>
       <MergeForm problemId={problemId} targets={targets} />
+    </section>
+  );
+}
+
+/** Where a brief's source id leads: the request below, a Problem, the scores or the strategy. */
+function sourceHref(source: string, problemId: number) {
+  const [kind, id] = source.split(":");
+  if (kind === "request") return `#request-${id}`;
+  if (kind === "problem")
+    return Number(id) === problemId ? "#" : `/problems/${id}`;
+  if (kind === "score") return "#scores";
+  if (kind === "strategy") return "/settings";
+  return null;
+}
+
+function Sources({ ids, problemId }: { ids: string[]; problemId: number }) {
+  return (
+    <span className="ml-1 inline-flex flex-wrap gap-1 align-baseline">
+      {ids.map((id) => {
+        const href = sourceHref(id, problemId);
+        return href ? (
+          <a
+            key={id}
+            href={href}
+            className="text-muted-foreground text-xs underline"
+          >
+            {id}
+          </a>
+        ) : (
+          <span key={id} className="text-muted-foreground text-xs">
+            {id}
+          </span>
+        );
+      })}
+    </span>
+  );
+}
+
+const BRIEF_SECTIONS = [
+  ["whoIsAsking", "Who is asking"],
+  ["scores", "Scores"],
+  ["options", "Solution options"],
+  ["risks", "Open questions and risks"],
+] as const satisfies [keyof Brief, string][];
+
+/** PM only: the agent's latest brief, every claim linked to its sources. */
+async function DecisionBrief({ problemId }: { problemId: number }) {
+  const latest = await getLatestBrief(deps, problemId);
+  const brief = latest?.content;
+  return (
+    <section aria-label="Decision brief" className="space-y-3">
+      <div className="flex items-center justify-between gap-4">
+        <h2 className="font-semibold text-lg">Decision brief</h2>
+        <BriefButton problemId={problemId} again={brief !== undefined} />
+      </div>
+      {latest && brief ? (
+        <div className="space-y-4 rounded-md border p-4 text-sm">
+          <p className="text-muted-foreground text-xs">
+            Drafted by AI on {dateFormat.format(latest.createdAt)}; check its
+            sources before relying on it.
+          </p>
+          <p>
+            {brief.statement.text}
+            <Sources ids={brief.statement.sources} problemId={problemId} />
+          </p>
+          {brief.quotes.length > 0 && (
+            <div className="space-y-1">
+              <h3 className="font-medium">Representative quotes</h3>
+              {brief.quotes.map((q) => (
+                <blockquote key={q.quote} className="border-l-2 pl-3">
+                  “{q.quote}”
+                  <Sources ids={[q.source]} problemId={problemId} />
+                </blockquote>
+              ))}
+            </div>
+          )}
+          {BRIEF_SECTIONS.map(([key, title]) => (
+            <div key={key} className="space-y-1">
+              <h3 className="font-medium">{title}</h3>
+              <ul className="list-disc space-y-1 pl-5">
+                {brief[key].map((c) => (
+                  <li key={c.text}>
+                    {c.text}
+                    <Sources ids={c.sources} problemId={problemId} />
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-muted-foreground">No brief yet.</p>
+      )}
     </section>
   );
 }

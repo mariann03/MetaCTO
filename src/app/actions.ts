@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { z } from "zod";
+import { generateBrief } from "@/domain/brief";
 import { editStatement, mergeProblems } from "@/domain/curation";
 import {
   approveUpdate,
@@ -437,4 +438,19 @@ export async function mergeProblemsAction(
   revalidatePath("/");
   revalidatePath("/priorities");
   redirect(`/problems/${target.data}`);
+}
+
+export interface BriefState {
+  status: "idle" | "started" | "forbidden";
+}
+
+/** Gathers a brief after responding: the agent takes minutes on local models. */
+export async function generateBriefAction(
+  problemId: number,
+): Promise<BriefState> {
+  const user = await currentUser();
+  if (user.role !== "pm") return { status: "forbidden" };
+  const id = z.number().int().positive().parse(problemId);
+  after(() => generateBrief(deps, { userId: user.id, problemId: id }));
+  return { status: "started" };
 }
