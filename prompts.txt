@@ -380,6 +380,18 @@ Response: Branch feat/13-ai-scoring (in the worktree). Added AI scoring: a score
 Prompt: looks good, next
 Response: Started #15 (decisions and updates) on feat/15-decisions-updates, stacked on the #13 branch since PR #29 is not merged yet. PMs record a decision (status and public rationale); two updates are drafted in parallel, the customer one from public facts only; the PM edits and approves each; an approved customer update notifies every supporter and appears on the Problem's feed; submitters get a Notifications page. Service and E2E tests pass.
 
+[2026-10-13T07:50:00Z]
+Prompt: both should be merged before continue
+Response: Merged PR #29 (#13), retargeted PR #30 to main and merged it (#15). Both issues are closed and main is updated in the worktree.
+
+[2026-10-13T08:10:00Z]
+Prompt: whats next?
+Response: Suggested #11 (merge Problems; edit, lock and version statements) as next on the agreed order, then #16, #14, #7, #17/#19, #18.
+
+[2026-10-13T08:12:00Z]
+Prompt: /mattpocock-skills:implement #11
+Response: Branch feat/11-merge-lock. PMs merge a duplicate Problem into another (requests and supports move, a supporter of both counted once with their note kept, source deleted, event logged; a decided source is refused), edit and lock statements (PM-authored versions, AI never rewrites a locked statement) and see the version history. Service and E2E tests pass.
+
 [2026-10-13T09:00:00Z]
 Prompt: /mattpocock-skills:implement #23
 Response: Branch feat/23-duplicate-recall. Made the eval compare intake setups: --intake-model, --candidates and --reasoning flags, per-request model time (stored with each cache entry so replays report live latency), per-setup results in data/eval/runs/, and a prompt id so prompt variants stay apart. Ran the current setup and 5 candidates; the qwen3.6:27b run was stopped at 70/150 for low memory.

@@ -2,8 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { z } from "zod";
+import { editStatement, mergeProblems } from "@/domain/curation";
 import {
   approveUpdate,
   DECISIONS,
@@ -377,4 +379,62 @@ export async function approveUpdateAction(
   revalidatePath(`/problems/${z.number().int().positive().parse(problemId)}`);
   revalidatePath("/notifications");
   return { status };
+}
+
+export interface StatementState {
+  status: "idle" | "saved" | "missing" | "invalid" | "forbidden";
+}
+
+export async function editStatementAction(
+  problemId: number,
+  _prev: StatementState,
+  form: FormData,
+): Promise<StatementState> {
+  const user = await currentUser();
+  if (user.role !== "pm") return { status: "forbidden" };
+  const statement = z
+    .string()
+    .trim()
+    .min(1)
+    .max(1000)
+    .safeParse(form.get("statement"));
+  if (!statement.success) return { status: "invalid" };
+  const id = z.number().int().positive().parse(problemId);
+  const status = await editStatement(deps, {
+    userId: user.id,
+    problemId: id,
+    statement: statement.data,
+    locked: form.get("locked") === "on",
+  });
+  revalidatePath(`/problems/${id}`);
+  return { status };
+}
+
+export interface MergeState {
+  status: "idle" | "invalid" | "decided" | "forbidden";
+}
+
+/** Merges this Problem into the chosen one, then shows the merged Problem. */
+export async function mergeProblemsAction(
+  sourceId: number,
+  _prev: MergeState,
+  form: FormData,
+): Promise<MergeState> {
+  const user = await currentUser();
+  if (user.role !== "pm") return { status: "forbidden" };
+  const target = z.coerce
+    .number()
+    .int()
+    .positive()
+    .safeParse(form.get("target"));
+  if (!target.success) return { status: "invalid" };
+  const status = await mergeProblems(deps, {
+    userId: user.id,
+    sourceId: z.number().int().positive().parse(sourceId),
+    targetId: target.data,
+  });
+  if (status !== "merged") return { status };
+  revalidatePath("/");
+  revalidatePath("/priorities");
+  redirect(`/problems/${target.data}`);
 }

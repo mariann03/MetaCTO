@@ -391,10 +391,13 @@ async function runSubmission(
   const grouped = await deps.db.transaction((tx) =>
     attach(tx, deps, request, result, candidate, tier),
   );
+  // Merged away or emptied by a review while the model judged it: a new Problem, for review.
+  if (!grouped) return createProblemFromRequest(deps, request, result);
   // Only a confident grouping refines the statement; a medium one waits for the PM's review.
   const statement =
     tier === "high"
-      ? await refineStatement(deps, candidate.problemId, request)
+      ? ((await refineStatement(deps, candidate.problemId, request)) ??
+        grouped.statement)
       : grouped.statement;
   return { ...grouped, statement };
 }
@@ -469,8 +472,17 @@ async function createProblemFromRequest(
     if (
       meanwhile &&
       meanwhile.similarity >= lockMatchThreshold(analyzed.analysis)
-    )
-      return attach(tx, deps, request, analyzed, meanwhile, "medium");
+    ) {
+      const grouped = await attach(
+        tx,
+        deps,
+        request,
+        analyzed,
+        meanwhile,
+        "medium",
+      );
+      if (grouped) return grouped;
+    }
 
     const problem = { id: await insertProblem(tx, statement) };
     await markSubmitted(tx, deps, request, analyzed, problem.id, "low");
@@ -512,7 +524,14 @@ async function attach(
   analyzed: Analyzed,
   { problemId, similarity }: Candidate,
   tier: Tier,
-): Promise<Submitted> {
+): Promise<Submitted | null> {
+  // Key share: the Problem cannot be merged away or deleted by a review before this commits.
+  const [problem] = await tx
+    .select({ statement: problems.statement })
+    .from(problems)
+    .where(eq(problems.id, problemId))
+    .for("key share");
+  if (!problem) return null;
   await markSubmitted(tx, deps, request, analyzed, problemId, tier);
   const { match } = analyzed.analysis;
   await tx.insert(events).values({
@@ -528,11 +547,6 @@ async function attach(
       similarity,
     },
   });
-  const [problem] = await tx
-    .select({ statement: problems.statement })
-    .from(problems)
-    .where(eq(problems.id, problemId));
-  if (!problem) throw new Error(`Problem ${problemId} not found`);
   return {
     status: "submitted",
     requestId: request.id,
@@ -580,12 +594,13 @@ export async function refineStatement(
   { db, models }: Deps,
   problemId: number,
   request: RequestText,
-): Promise<string> {
+): Promise<string | null> {
   const [problem] = await db
     .select({ statement: problems.statement, locked: problems.statementLocked })
     .from(problems)
     .where(eq(problems.id, problemId));
-  if (!problem) throw new Error(`Problem ${problemId} not found`);
+  // Merged away since the request joined it: nothing left to refine.
+  if (!problem) return null;
   if (problem.locked) return problem.statement;
 
   try {
