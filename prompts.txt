@@ -407,3 +407,27 @@ Response: Adopted gemma4:12b with thinking on for intake (INTAKE_SETUP reasoning
 [2026-10-14T04:06:00Z]
 Prompt: #31 looks good to merge
 Response: Merged PR #31 (#11 closed) and merged the new main into the #23 branch.
+
+[2026-10-14T04:20:00Z]
+Prompt: /mattpocock-skills:implement #16
+Response: Branch feat/16-metrics. Metrics computed in SQL over the event log: deflection, missed duplicates, hands-off, median time to triaged, median time to first update, and the override guardrail for groupings and scores; a PM Metrics page shows them with their counts, plus the latest offline evaluation. Service test computes each metric from a known event log; E2E covers the page.
+
+[2026-10-14T05:00:00Z]
+Prompt: use ms for time variables
+Response: Metrics durations are now milliseconds (Duration.medianMs, computed in SQL from epoch * 1000), formatted on the page with the ms package; the metrics test writes its event log with ms("30m")-style offsets.
+
+[2026-10-14T05:10:00Z]
+Prompt: looking good, merge it and check whats next
+Response: Merged PR #32 (#16 closed). Suggested #14 (decision brief agent) next; remaining after it: #7, #17, #19, #18.
+
+[2026-10-14T05:20:00Z]
+Prompt: /mattpocock-skills:implement #14
+Response: Branch feat/14-brief-agent. Decision brief agent: a ToolLoopAgent (reasoning model, thinking on, 8-step cap) with six read-only tools bound to the Problem, structured output where every claim cites source ids the tools returned (anything else rejects the brief), stored per Problem and generated in the background; the PM view renders it with linked sources. Service tests cover tool use, citations, the step cap and that no data changes; E2E covers generating a brief.
+
+[2026-10-14T06:00:00Z]
+Prompt: looking good, merge and check whats next
+Response: Merged PR #33 (#14 closed). Suggested #7 (clarifying questions) next; then #17, #19, #18.
+
+[2026-10-14T06:05:00Z]
+Prompt: /mattpocock-skills:implement #7
+Response: Branch feat/7-clarifying-questions. On Next, a fast-tier call (thinking off) asks up to maxClarifyingQuestions questions when a request names a solution without the need (0 skips the call); each is optional and skippable; answers are stored with the request, shown on the Problem page and added to the intake prompt (unchanged without answers, so cached answers replay); the PM sets the limit (0-3) in Settings. Also fixed the #23 seed to leave a Problem unscored when its scoring is rejected, and restarted it.

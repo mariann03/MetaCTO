@@ -13,7 +13,8 @@ import {
   uniqueIndex,
   vector,
 } from "drizzle-orm/pg-core";
-import type { RequestAnalysis } from "@/domain/intake";
+import type { Brief } from "@/domain/brief";
+import type { Clarification, RequestAnalysis } from "@/domain/intake";
 import { JUDGED } from "@/domain/ranking";
 
 /** Embedding vector size; every configured embedding model must produce it. */
@@ -130,6 +131,11 @@ export const requests = pgTable(
     // The submitter's words, never modified after insert.
     title: text("title").notNull(),
     description: text("description").notNull(),
+    // Clarifying questions the submitter answered before submitting; skipped ones are left out.
+    clarifications: jsonb("clarifications")
+      .$type<Clarification[]>()
+      .notNull()
+      .default([]),
     status: requestStatus("status").notNull().default("draft"),
     // When the current analysis run claimed the request; old claims count as crashed runs.
     analysisStartedAt: timestamp("analysis_started_at", { withTimezone: true }),
@@ -284,5 +290,25 @@ export const notifications = pgTable(
   (t) => [
     uniqueIndex("notifications_user_update_idx").on(t.userId, t.updateId),
     index("notifications_update_id_idx").on(t.updateId),
+  ],
+);
+
+/** A decision brief the agent gathered for a PM; its claims cite the sources it read. */
+export const briefs = pgTable(
+  "briefs",
+  {
+    id: id(),
+    problemId: refColumn("problem_id")
+      .notNull()
+      .references(() => problems.id, { onDelete: "cascade" }),
+    content: jsonb("content").$type<Brief>().notNull(),
+    requestedBy: refColumn("requested_by")
+      .notNull()
+      .references(() => users.id),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("briefs_problem_id_idx").on(t.problemId),
+    index("briefs_requested_by_idx").on(t.requestedBy),
   ],
 );

@@ -5,7 +5,15 @@ import type { DbDeps } from "./deps";
 import { requirePm } from "./directory";
 
 /** Settings rows by key; every setting lives in the key/value `settings` table. */
-const KEYS = { strategy: "strategy", matchMode: "matchMode" } as const;
+const KEYS = {
+  strategy: "strategy",
+  matchMode: "matchMode",
+  maxClarifyingQuestions: "maxClarifyingQuestions",
+} as const;
+
+/** How many clarifying questions a submitter may be asked; 0 turns them off. */
+export const MAX_CLARIFYING_QUESTIONS = 3;
+const DEFAULT_CLARIFYING_QUESTIONS = 1;
 
 /** hybrid: embedding similarity plus the model's verdict; similarity-only: thresholds alone. */
 export const MATCH_MODES = ["hybrid", "similarity-only"] as const;
@@ -59,6 +67,37 @@ export async function getStrategy({ db }: DbDeps): Promise<string> {
 export async function getMatchMode({ db }: DbDeps): Promise<MatchMode> {
   const value = await readSetting(db, KEYS.matchMode);
   return MATCH_MODES.find((mode) => mode === value) ?? "hybrid";
+}
+
+export async function getMaxClarifyingQuestions({ db }: DbDeps) {
+  const value = await readSetting(db, KEYS.maxClarifyingQuestions);
+  return typeof value === "number" ? value : DEFAULT_CLARIFYING_QUESTIONS;
+}
+
+/** PMs set how many clarifying questions submitters may be asked (e.g. to compare 0 and 1). */
+export async function setMaxClarifyingQuestions(
+  { db }: DbDeps,
+  { userId, max }: { userId: number; max: number },
+) {
+  await requirePm({ db }, userId, "change the clarifying questions");
+  if (!Number.isInteger(max) || max < 0 || max > MAX_CLARIFYING_QUESTIONS)
+    throw new Error(
+      `Between 0 and ${MAX_CLARIFYING_QUESTIONS} questions, not ${max}`,
+    );
+  await db.transaction(async (tx) => {
+    await tx
+      .insert(settings)
+      .values({ key: KEYS.maxClarifyingQuestions, value: max })
+      .onConflictDoUpdate({ target: settings.key, set: { value: max } });
+    await tx.insert(events).values({
+      type: "max_clarifying_questions_changed",
+      actor: "pm",
+      actorId: userId,
+      entityType: "setting",
+      entityId: 0,
+      payload: { max },
+    });
+  });
 }
 
 /** PMs switch between hybrid and similarity-only matching (e.g. to compare them). */

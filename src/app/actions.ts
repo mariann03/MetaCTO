@@ -5,6 +5,8 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { z } from "zod";
+import { generateBrief } from "@/domain/brief";
+import { askClarifyingQuestions } from "@/domain/clarify";
 import { editStatement, mergeProblems } from "@/domain/curation";
 import {
   approveUpdate,
@@ -13,6 +15,7 @@ import {
   recordDecision,
 } from "@/domain/decisions";
 import {
+  type Clarification,
   requestSplit,
   resubmitDraft,
   type SubmitResult,
@@ -27,7 +30,14 @@ import {
 import { JUDGED } from "@/domain/ranking";
 import { reviewRequest } from "@/domain/review";
 import { overrideScore, rescoreProblem, rescoreStale } from "@/domain/scoring";
-import { MATCH_MODES, setMatchMode, updateStrategy } from "@/domain/settings";
+import {
+  getMaxClarifyingQuestions,
+  MATCH_MODES,
+  MAX_CLARIFYING_QUESTIONS,
+  setMatchMode,
+  setMaxClarifyingQuestions,
+  updateStrategy,
+} from "@/domain/settings";
 import { deps } from "@/server/deps";
 import { getSession, USER_COOKIE } from "@/server/session";
 
@@ -55,12 +65,24 @@ const requestInput = z.object({
     .max(5000),
 });
 
-// React resets the form after every action, so text that was not saved is echoed back.
+// React resets the form after every action, so text that was not saved is echoed back,
+// clarifying answers included.
 export type SubmitState = (
   | { status: "idle" }
   | SubmitResult
   | { status: "invalid"; errors: { title?: string[]; description?: string[] } }
-) & { fields?: z.input<typeof requestInput> };
+) & {
+  fields?: z.input<typeof requestInput> & { clarifications?: Clarification[] };
+};
+
+/** The clarifying questions and answers as the form sent them, paired by position. */
+function echoed(form: FormData): Clarification[] {
+  const questions = form.getAll("question").map(String);
+  return form.getAll("answer").map((answer, i) => ({
+    question: questions[i] ?? "",
+    answer: String(answer),
+  }));
+}
 
 export async function submitRequestAction(
   _prev: SubmitState,
@@ -75,16 +97,37 @@ export async function submitRequestAction(
     return {
       status: "invalid",
       errors: z.flattenError(parsed.error).fieldErrors,
-      fields,
+      fields: { ...fields, clarifications: echoed(form) },
+    };
+
+  const clarifications = echoed(form);
+  const asked = z
+    .array(
+      z.object({
+        question: z.string().trim().min(1).max(500),
+        answer: z.string().max(2000),
+      }),
+    )
+    .max(await getMaxClarifyingQuestions(deps))
+    .safeParse(clarifications);
+  // Only a tampered form gets here; the submitter keeps what they wrote.
+  if (!asked.success)
+    return {
+      status: "invalid",
+      errors: {},
+      fields: { ...fields, clarifications },
     };
 
   const user = await currentUser();
   const result = await submitRequest(deps, {
     authorId: user.id,
     ...parsed.data,
+    clarifications: asked.data,
   });
   revalidatePath("/my-requests");
-  return result.status === "rate_limited" ? { ...result, fields } : result;
+  return result.status === "rate_limited"
+    ? { ...result, fields: { ...fields, clarifications } }
+    : result;
 }
 
 export async function resubmitDraftAction(
@@ -437,4 +480,54 @@ export async function mergeProblemsAction(
   revalidatePath("/");
   revalidatePath("/priorities");
   redirect(`/problems/${target.data}`);
+}
+
+export interface BriefState {
+  status: "idle" | "started" | "forbidden";
+}
+
+/** Gathers a brief after responding: the agent takes minutes on local models. */
+export async function generateBriefAction(
+  problemId: number,
+): Promise<BriefState> {
+  const user = await currentUser();
+  if (user.role !== "pm") return { status: "forbidden" };
+  const id = z.number().int().positive().parse(problemId);
+  after(() => generateBrief(deps, { userId: user.id, problemId: id }));
+  return { status: "started" };
+}
+
+/** Clarifying questions for the request as written; none when asking fails, so nobody is blocked. */
+export async function askQuestionsAction(
+  title: string,
+  description: string,
+): Promise<string[]> {
+  await currentUser();
+  const text = requestInput.safeParse({ title, description });
+  if (!text.success) return [];
+  return askClarifyingQuestions(deps, text.data).catch((error: unknown) => {
+    console.error("Asking clarifying questions failed", error);
+    return [];
+  });
+}
+
+export interface ClarifyingSettingState {
+  status: "idle" | "saved" | "forbidden";
+}
+
+export async function setMaxClarifyingQuestionsAction(
+  _prev: ClarifyingSettingState,
+  form: FormData,
+): Promise<ClarifyingSettingState> {
+  const user = await currentUser();
+  if (user.role !== "pm") return { status: "forbidden" };
+  const max = z.coerce
+    .number()
+    .int()
+    .min(0)
+    .max(MAX_CLARIFYING_QUESTIONS)
+    .parse(form.get("max"));
+  await setMaxClarifyingQuestions(deps, { userId: user.id, max });
+  revalidatePath("/settings");
+  return { status: "saved" };
 }

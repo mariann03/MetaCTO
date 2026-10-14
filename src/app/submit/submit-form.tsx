@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useRef, useState } from "react";
 import {
+  askQuestionsAction,
   findMatchesAction,
   type Match,
   type SubmitState,
@@ -13,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import type { Clarification } from "@/domain/intake";
 
 const idle: SubmitState = { status: "idle" };
 // Live matching waits for enough text to match on and for a pause, so it does not embed every keystroke.
@@ -20,8 +22,9 @@ const MATCH_MIN_CHARS = 30;
 const MATCH_DEBOUNCE_MS = 500;
 
 /**
- * Two steps: write (matching Problems appear as you type), then Next shows the matches
- * and the submit button. A +1 on a match supports it instead of filing a duplicate.
+ * Two steps: write (matching Problems appear as you type), then Next shows the matches,
+ * any clarifying questions and the submit button. A +1 on a match supports it instead of
+ * filing a duplicate; every question can be skipped.
  */
 export function SubmitForm() {
   const [state, action, pending] = useActionState(submitRequestAction, idle);
@@ -82,6 +85,12 @@ function RequestForm({
       : "write",
   );
   const [matches, setMatches] = useState<Match[] | null>(null);
+  // null while the questions are being asked for; a refused submission brings its answers back.
+  const [questions, setQuestions] = useState<Clarification[] | null>(
+    state.fields?.clarifications ?? [],
+  );
+  // Bumped when the text changes, so questions about older text never land.
+  const asking = useRef(0);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   // Bumped to discard lookups still in flight: only the latest may show its matches.
   const latest = useRef(0);
@@ -114,6 +123,15 @@ function RequestForm({
         action={action}
         className="space-y-4"
         onChange={(e) => {
+          // Only the request text matters; typing an answer changes neither.
+          const field = (e.target as HTMLElement).getAttribute("name");
+          if (field !== "title" && field !== "description") return;
+          // Questions were about the old text: back to Next, which asks again.
+          if (step === "confirm") {
+            asking.current++;
+            setQuestions([]);
+            setStep("write");
+          }
           const form = e.currentTarget;
           const { title, description } = formText(form);
           cancelLookups();
@@ -151,9 +169,50 @@ function RequestForm({
             <p className="text-destructive text-sm">{errors.description[0]}</p>
           )}
         </div>
+        {step === "confirm" && questions === null && (
+          <p className="text-muted-foreground text-sm">
+            Checking whether we need anything else…
+          </p>
+        )}
+        {step === "confirm" &&
+          questions?.map(({ question, answer }, i) => (
+            // Questions are unique (the domain drops repeats), so the text is a stable key.
+            <fieldset
+              key={question}
+              className="space-y-2 rounded-md border p-3"
+            >
+              <input type="hidden" name="question" value={question} />
+              <Label htmlFor={`answer-${i}`}>{question}</Label>
+              <Textarea
+                id={`answer-${i}`}
+                name="answer"
+                rows={2}
+                maxLength={2000}
+                defaultValue={answer}
+                placeholder="Optional: helps us understand what you need"
+              />
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={() =>
+                  setQuestions(
+                    (qs) => qs?.filter((q) => q.question !== question) ?? [],
+                  )
+                }
+              >
+                Skip this question
+              </Button>
+            </fieldset>
+          ))}
         {/* Keyed apart: reusing the Next button as the submit button would submit on Next. */}
         {step === "confirm" ? (
-          <Button key="submit" type="submit" disabled={pending}>
+          <Button
+            key="submit"
+            type="submit"
+            // Waits for the questions, which time out on the server, so they are seen.
+            disabled={pending || questions === null}
+          >
             {pending ? "Analyzing…" : "Submit request"}
           </Button>
         ) : (
@@ -162,7 +221,20 @@ function RequestForm({
             type="button"
             onClick={(e) => {
               const { form } = e.currentTarget;
-              if (form) void match(form);
+              if (form) {
+                void match(form);
+                const { title, description } = formText(form);
+                const call = ++asking.current;
+                setQuestions(null);
+                void askQuestionsAction(title, description)
+                  .catch(() => [])
+                  .then((asked) => {
+                    if (call === asking.current)
+                      setQuestions(
+                        asked.map((question) => ({ question, answer: "" })),
+                      );
+                  });
+              }
               setStep("confirm");
             }}
           >
