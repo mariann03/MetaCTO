@@ -1,7 +1,7 @@
 import { expect, type Page, test } from "@playwright/test";
-import { asPm, asSubmitter, submit } from "./helpers";
+import { asPm, asSubmitter, submit, weighOnly } from "./helpers";
 
-const COLUMNS = { Reach: 3, "Business value": 4, Score: 5 } as const;
+const COLUMNS = { Reach: 3, "Business value": 4, Score: 8 } as const;
 
 /** One column's score in each ranked row, top to bottom. */
 async function scores(page: Page, name: keyof typeof COLUMNS) {
@@ -36,18 +36,9 @@ test("a PM weighs the criteria and the ranking follows", async ({ page }) => {
     await expect(
       page.getByRole("cell", { name: `Customers need ${need}.` }),
     ).toBeVisible();
-  const reach = page.getByRole("slider", { name: "Reach weight" });
-  const value = page.getByRole("slider", { name: "Business value weight" });
-
-  await reach.press("End");
-  await value.press("Home");
-  await expect(reach).toHaveValue("10");
-  await expect(value).toHaveValue("0");
+  await weighOnly(page, "Reach");
   await expectRankedBy(page, "Reach");
 
-  await reach.press("Home");
-  await value.press("End");
-  await expect(reach).toHaveValue("0");
-  await expect(value).toHaveValue("10");
+  await weighOnly(page, "Business value");
   await expectRankedBy(page, "Business value");
 });

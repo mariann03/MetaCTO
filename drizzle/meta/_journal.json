@@ -50,6 +50,13 @@
       "when": 1791818649669,
       "tag": "0006_support_note",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791942470931,
+      "tag": "0007_scores",
+      "breakpoints": true
     }
   ]
 }

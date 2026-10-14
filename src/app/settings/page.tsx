@@ -10,10 +10,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { thresholdsFor } from "@/domain/intake";
-import { getMatchMode, MATCH_MODES } from "@/domain/settings";
+import { getMatchMode, getStrategy, MATCH_MODES } from "@/domain/settings";
 import { deps } from "@/server/deps";
 import { getSession } from "@/server/session";
 import { MatchModeForm } from "./match-mode-form";
+import { StrategyForm } from "./strategy-form";
 
 const BASIS = {
   tuned: "Tuned on enough evidence",
@@ -41,13 +42,17 @@ async function MatchingSettings() {
       </p>
     );
 
-  const mode = await getMatchMode(deps);
+  const [mode, strategy] = await Promise.all([
+    getMatchMode(deps),
+    getStrategy(deps),
+  ]);
   const embeddingModel = embeddingModelName(deps.models.embedding);
   const modes = thresholdsFor(embeddingModel);
   return (
-    <div className="space-y-4">
+    <div className="space-y-8">
+      <StrategyForm strategy={strategy} />
       <MatchModeForm mode={mode} />
-      <Table>
+      <Table className="-mt-4">
         <TableCaption>
           Thresholds in use for {embeddingModel} (set by the evaluation,
           read-only)

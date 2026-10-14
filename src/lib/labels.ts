@@ -1,5 +1,6 @@
 import type { segment } from "@/db/schema";
 import type { ProblemStatus } from "@/domain/problems";
+import type { Judged } from "@/domain/ranking";
 
 export type Segment = (typeof segment.enumValues)[number];
 
@@ -15,4 +16,10 @@ export const STATUS_LABELS: Record<ProblemStatus, string> = {
   planned: "Planned",
   declined: "Declined",
   shipped: "Shipped",
+};
+
+export const JUDGED_LABELS: Record<Judged, string> = {
+  strategicFit: "Strategic fit",
+  urgency: "Urgency",
+  effort: "Effort (rough guess)",
 };

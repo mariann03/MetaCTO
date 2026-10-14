@@ -839,7 +839,7 @@ export async function findCandidates(
 }
 
 /** Keeps customer text from closing the prompt's delimiter tags. */
-function escapeMarkup(text: string) {
+export function escapeMarkup(text: string) {
   return text
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")

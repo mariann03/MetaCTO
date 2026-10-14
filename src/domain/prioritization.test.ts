@@ -18,7 +18,7 @@ import { listUsers, seedDirectory } from "./directory";
 import { insertProblem } from "./intake";
 import { listCriteria } from "./prioritization";
 import { addSupport } from "./problems";
-import { rank } from "./ranking";
+import { rank, type Weights } from "./ranking";
 
 let db: Db;
 
@@ -113,6 +113,7 @@ describe("listCriteria", () => {
       arr: 4800,
       churnRiskArr: 0,
       segments: { smb: 1, mid_market: 0, enterprise: 0 },
+      judged: { strategicFit: null, urgency: null, effort: null },
     });
     expect(byId.get(ids.sso)).toMatchObject({
       supporters: 1,
@@ -178,12 +179,19 @@ describe("listCriteria", () => {
 describe("rank", () => {
   const order = (ranked: { statement: string }[]) =>
     ranked.map((r) => r.statement);
+  // Only the computed criteria; AI scoring has its own tests.
+  const weights = (w: Pick<Weights, "reach" | "businessValue">): Weights => ({
+    ...w,
+    strategicFit: 0,
+    urgency: 0,
+    effort: 0,
+  });
 
   test("scores each criterion relative to the top Problem", async () => {
-    const ranked = rank(await listCriteria({ db }), {
-      reach: 1,
-      businessValue: 1,
-    });
+    const ranked = rank(
+      await listCriteria({ db }),
+      weights({ reach: 1, businessValue: 1 }),
+    );
     const scores = Object.fromEntries(
       ranked.map((r) => [r.statement, r.scores]),
     );
@@ -194,35 +202,36 @@ describe("rank", () => {
     // Business value: ARR with at-risk ARR counted twice (max 240,000 for SSO).
     expect(scores.SSO?.businessValue).toBeCloseTo(1);
     expect(scores.Payroll?.businessValue).toBeCloseTo(34800 / 240000);
-    expect(scores["Audit log"]).toEqual({ reach: 0, businessValue: 0 });
+    // Never scored by the AI: its judged criteria count as the middle.
+    expect(scores["Audit log"]).toEqual({
+      reach: 0,
+      businessValue: 0,
+      strategicFit: 0.5,
+      urgency: 0.5,
+      effort: 0.5,
+    });
   });
 
   test("orders by the weighted score, which follows the weights", async () => {
     const criteria = await listCriteria({ db });
 
-    expect(order(rank(criteria, { reach: 1, businessValue: 0 }))).toEqual([
-      "Payroll",
-      "Exports",
-      "SSO",
-      "Audit log",
-    ]);
-    expect(order(rank(criteria, { reach: 0, businessValue: 1 }))).toEqual([
-      "SSO",
-      "Payroll",
-      "Exports",
-      "Audit log",
-    ]);
+    expect(
+      order(rank(criteria, weights({ reach: 1, businessValue: 0 }))),
+    ).toEqual(["Payroll", "Exports", "SSO", "Audit log"]);
+    expect(
+      order(rank(criteria, weights({ reach: 0, businessValue: 1 }))),
+    ).toEqual(["SSO", "Payroll", "Exports", "Audit log"]);
     // Reach 3 to 1: Payroll .661, Exports .568, SSO .563.
-    const mixed = rank(criteria, { reach: 3, businessValue: 1 });
+    const mixed = rank(criteria, weights({ reach: 3, businessValue: 1 }));
     expect(order(mixed)).toEqual(["Payroll", "Exports", "SSO", "Audit log"]);
     expect(mixed[0]?.score).toBeCloseTo((3 * 0.8333 + 34800 / 240000) / 4, 3);
   });
 
   test("with every weight at zero, all score zero and keep the oldest first", async () => {
-    const ranked = rank(await listCriteria({ db }), {
-      reach: 0,
-      businessValue: 0,
-    });
+    const ranked = rank(
+      await listCriteria({ db }),
+      weights({ reach: 0, businessValue: 0 }),
+    );
 
     expect(ranked.map((r) => r.score)).toEqual([0, 0, 0, 0]);
     expect(order(ranked)).toEqual(["Exports", "SSO", "Payroll", "Audit log"]);
