@@ -455,3 +455,7 @@ Response: Committed the #17 work in progress and drafted the README on feat/18-r
 [2026-10-14T07:40:00Z]
 Prompt: is there anything else we can run in parallel?
 Response: While the vscode eval runs, refreshed the #18 README against main in a separate worktree (../MetaCTO-18) and offered a Loom demo script; listed the pending decisions (Cloudflare Access, keeping the demo up as services, stopping the Langfuse stack).
+
+[2026-10-14T07:55:00Z]
+Prompt: (chose: Loom demo script, Cloudflare Access on demo, stop Langfuse stack, add package.json scripts to start/stop Langfuse)
+Response: Stopped the Langfuse stack; gave the compose file a fixed project name and added bun run langfuse:up / langfuse:down (tried both); wrote docs/demo-script.md, a ~10 minute walkthrough on the seeded data with prep steps; listed the Cloudflare Access dashboard steps (cloudflared's login cannot create Access apps).
