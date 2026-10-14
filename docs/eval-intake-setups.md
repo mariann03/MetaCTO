@@ -86,6 +86,33 @@ Grouping duplicates is the point of the product, so we took recall and paid in l
   with an explicit `--reasoning` level.
 - A larger labeled set would let the high tier be tuned, so confident matches skip review.
 
+## On real data: vscode feature requests (#19)
+
+The fixtures were written for this product, so they may flatter it. As a check on real,
+messy text, the adopted setup also ran on 325 microsoft/vscode feature requests
+(`bun run eval --dataset vscode`). Ground truth there is the `/duplicate` marks maintainers
+left: 103 duplicates of 222 Problems, 98 requests held out (28 of them duplicates).
+
+| Hybrid, train / holdout | Grouped recall | Medium precision | New kept new | Retrieval | Median / p90 time |
+|---|---|---|---|---|---|
+| Fixtures (above) | 57% / 53% | 68% / 77% | 71% / 80% | 76% @3 | 30.1 s / 74.2 s |
+| vscode | 76% / 82% | ≥45% / ≥55% | ≥61% / ≥73% | 90% @3 | 30.2 s / 48.7 s |
+
+- **Duplicates are grouped more often than on the fixtures.** People filing the same vscode
+  request tend to restate it closely, so retrieval finds the original 90% of the time and the
+  model agrees.
+- **Precision and new kept new are lower bounds.** Maintainers mark only some duplicates, so a
+  request grouped with an unmarked duplicate counts as a wrong grouping. All 19 wrong holdout
+  groupings put a request with no duplicate mark into an existing Problem. How many of them are
+  real mistakes is unknown without labeling them by hand.
+- The holdout is small (28 duplicates, 42 reviews), so each request moves grouped recall by
+  about 4 points.
+
+This run's model answers are not in the cache (they were lost before being committed), so
+unlike the fixture runs it does not replay offline: running it again calls the models, and
+the numbers will vary a little. Its results are in
+`data/eval/runs/vscode_ollama_gemma4_12b_prompt=edb47c00_candidates=3_reasoning=provider-default.json`.
+
 ## Reproducing
 
 ```sh
@@ -93,6 +120,7 @@ bun run eval                                            # the adopted setup; als
 bun run eval --reasoning none                           # thinking off
 bun run eval --candidates 5 --reasoning none
 bun run eval --intake-model ollama:qwen3.6:27b --reasoning none
+bun run eval --dataset vscode                           # real vscode requests; never changes what intake runs with
 ```
 
 Each run writes `data/eval/runs/<model>_prompt=<id>_candidates=<n>_reasoning=<level>.json`.

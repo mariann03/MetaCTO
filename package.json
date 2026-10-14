@@ -16,6 +16,7 @@
     "test:e2e": "playwright test",
     "seed": "bun scripts/seed.ts",
     "eval": "bun scripts/eval.ts",
+    "dataset:vscode": "bun scripts/oss-dataset.ts",
     "reembed": "bun scripts/reembed.ts"
   },
   "dependencies": {

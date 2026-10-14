@@ -26,10 +26,21 @@ const requestFixtureSchema = z.strictObject({
   tags: z.array(z.string()),
 });
 
-/** The labeled fixture requests, in submission order. */
-export async function loadRequestFixtures() {
+/**
+ * Labeled request sets the eval replays: the synthetic fixtures (also seeded into the demo),
+ * or real vscode feature requests, which are eval-only.
+ */
+export type Dataset = "fixtures" | "vscode";
+const DATASET_FILES: Record<Dataset, string[]> = {
+  fixtures: ["fixtures", "requests.json"],
+  vscode: ["eval", "oss", "vscode.json"],
+};
+export const DATASETS = ["fixtures", "vscode"] as const satisfies Dataset[];
+
+/** A dataset's labeled requests, in submission order. */
+export async function loadRequestFixtures(dataset: Dataset = "fixtures") {
   const raw = await readFile(
-    join(process.cwd(), "data", "fixtures", "requests.json"),
+    join(process.cwd(), "data", ...DATASET_FILES[dataset]),
     "utf8",
   );
   return z.array(requestFixtureSchema).parse(JSON.parse(raw));
