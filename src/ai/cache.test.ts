@@ -116,6 +116,32 @@ describe("withResponseCache", () => {
     expect(slow.doGenerateCalls).toHaveLength(1);
   });
 
+  test("a failed call reports the time it cost and stores nothing", async () => {
+    const failing = new MockLanguageModelV4({
+      provider: "test",
+      modelId: "failing",
+      doGenerate: async () => {
+        await Bun.sleep(30);
+        throw new Error("timed out");
+      },
+    });
+    const store = memoryStore();
+    const times: number[] = [];
+    const cached = withResponseCache(
+      { ...models().models, intake: failing },
+      store,
+      (ms) => times.push(ms),
+    );
+
+    await expect(
+      generateText({ model: cached.intake, prompt: "hi", maxRetries: 0 }),
+    ).rejects.toThrow();
+
+    expect(times).toHaveLength(1);
+    expect(times[0]).toBeGreaterThanOrEqual(25);
+    expect(store.dump()).toEqual({});
+  });
+
   test("an entry stored without its time is fetched again", async () => {
     const { language, models: m } = models();
     const store = memoryStore();

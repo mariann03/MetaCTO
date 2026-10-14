@@ -38,14 +38,14 @@ export const ANALYSIS_ATTEMPTS = 3;
 const ATTEMPT_TIMEOUT = ms("2m");
 /**
  * How intake matches: how many Problems the model is offered per request, and how much it
- * reasons before its verdict. The eval compares setups (`bun run eval --help`).
+ * reasons before its verdict. The eval compares setups (flags in scripts/eval.ts).
  */
 export interface IntakeSetup {
   candidates: number;
   reasoning: NonNullable<Parameters<typeof generateText>[0]["reasoning"]>;
 }
-// Thinking on: it groups 15-19 points more duplicates than off at the same precision,
-// for about 3x the time (docs/eval-intake-setups.md).
+// Thinking on: it groups 11-19 points more duplicates than off, at the same or better
+// precision, for about 3x the time (docs/eval-intake-setups.md).
 export const INTAKE_SETUP: IntakeSetup = {
   candidates: 3,
   reasoning: "provider-default",

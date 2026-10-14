@@ -16,8 +16,9 @@ Problems. This note compares the setups we measured and why intake now runs with
   If this drops, real new needs get buried inside unrelated Problems.
 - **Retrieval recall@k**: how often the right Problem was among the k candidates the model
   saw. No verdict can beat it.
-- **Model time per request**: the live time of the intake call, also when the eval replays
-  from the cache. The customer waits on it, because analysis runs during submission.
+- **Model time per request**: the live time of all of a request's model calls (embedding
+  and intake verdict, including failed attempts), also when the eval replays from the cache.
+  The customer waits on it, because analysis runs during submission.
 
 ## Results
 
@@ -42,9 +43,9 @@ qwen3.6:27b failed to analyze 4 of the 150 requests; the rationale-first prompt 
 - **A bigger model (qwen3.6:27b)** is the most precise: 89% of its holdout matches were right.
   It barely groups more, takes twice the time, and needs about 33 GB of the machine's 36 GB.
   On this laptop that rules it out for a step that runs on every submission.
-- **Thinking on** is the only change that improved every quality measure at once: 15 to 19
-  points more duplicates grouped, slightly better precision, and new problems kept new as
-  often as before. It costs about 3 times the time, with a long tail.
+- **Thinking on** is the only change that improved every quality measure at once: 11 to 19
+  points more duplicates grouped (19 on train, 11 on holdout), slightly better precision, and
+  new problems kept new as often as before. It costs about 3 times the time, with a long tail.
 - **Prompt changes did not help.**
   - The granularity rule told the model that one piece of product work makes one Problem,
     and to answer related_but_different only when solving the candidate would leave the need
@@ -78,7 +79,9 @@ Grouping duplicates is the point of the product, so we took recall and paid in l
   lands. Thinking on would then cost nothing anyone waits for.
 - A hosted model (one env change, e.g. `INTAKE_MODEL=anthropic:claude-haiku-5-5`) is likely
   both faster and better at this judgement. It is worth adding to this table once there is a
-  key to run it with.
+  key to run it with. Note that `INTAKE_SETUP` asks for the provider's default reasoning,
+  which means thinking on for gemma4 on Ollama but may mean none elsewhere, so measure it
+  with an explicit `--reasoning` level.
 - A larger labeled set would let the high tier be tuned, so confident matches skip review.
 
 ## Reproducing
@@ -92,4 +95,5 @@ bun run eval --intake-model ollama:qwen3.6:27b --reasoning none
 
 Each run writes `data/eval/runs/<model>_prompt=<id>_candidates=<n>_reasoning=<level>.json`.
 The two prompt variants are no longer in the code. Their results stay in `runs/` under their
-prompt ids, and their answers stay in the cache.
+prompt ids, and their answers stay in the cache: a completed run only prunes its own entries,
+so a prompt's entries stay until its run record is removed from the cache file.

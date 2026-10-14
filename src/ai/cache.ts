@@ -24,7 +24,7 @@ function keyOf(
  * Answers repeated model calls from `store`, keyed by model and request parameters.
  * Only the JSON-safe parts of a response are kept, so the store can live on disk.
  * Each entry also keeps how long the live call took, reported to `onTime` on every call
- * (live or replayed), so a replayed eval still measures latency. An entry without a time
+ * (live, failed or replayed), so a replayed eval still measures latency. An entry without a time
  * (stored before times were kept) is fetched again.
  */
 export function withResponseCache(
@@ -44,8 +44,16 @@ export function withResponseCache(
       return response as T;
     }
     const start = performance.now();
-    const response = await call();
-    const ms = Math.round(performance.now() - start);
+    const elapsed = () => Math.round(performance.now() - start);
+    let response: T;
+    try {
+      response = await call();
+    } catch (error) {
+      // A failed call (e.g. a timeout) still cost the wait; it just is not stored.
+      onTime(elapsed());
+      throw error;
+    }
+    const ms = elapsed();
     store.set(key, { ...response, ms });
     onTime(ms);
     return response;

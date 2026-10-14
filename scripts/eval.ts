@@ -63,7 +63,8 @@ const isIntakeSetup =
   setup.candidates === INTAKE_SETUP.candidates &&
   setup.reasoning === INTAKE_SETUP.reasoning;
 
-// Model time of the current request: what it took live, even when replayed from the cache.
+// Model time of the current request (every model call it made: embedding, intake, failed
+// attempts): what it took live, even when replayed from the cache.
 let requestMs = 0;
 const { models, save } = createCachedModels(env, `eval ${setupName}`, (ms) => {
   requestMs += ms;
@@ -114,8 +115,9 @@ const row = (m: Metrics) =>
   `high ${String(m.high.count).padStart(3)} @${pct(m.high.precision)} | medium ${String(m.medium.count).padStart(3)} @${pct(m.medium.precision)} | low ${String(m.low.count).padStart(3)} @${pct(m.low.precision)} | auto-grouped ${pct(m.highRecall)} | grouped ${pct(m.attachRecall)} | new kept new ${pct(m.newRecall)}`;
 const retrieval = retrievalRecall(observations);
 const sorted = latencies.toSorted((a, b) => a - b);
+// Nearest rank: the smallest value with at least p of the requests at or below it.
 const percentile = (p: number) =>
-  sorted[Math.min(sorted.length - 1, Math.floor(p * sorted.length))] ?? 0;
+  sorted[Math.max(0, Math.ceil(p * sorted.length) - 1)] ?? 0;
 const latency = { medianMs: percentile(0.5), p90Ms: percentile(0.9) };
 console.log(
   `\nEmbedding ${embeddingModel}, intake ${env.INTAKE_MODEL}, ${setupName}; ${observations.length}/${fixtures.length} requests analyzed`,
@@ -124,7 +126,7 @@ console.log(
   `Retrieval: the right Problem was among the ${setup.candidates} candidates for ${pct(retrieval)} of groupable requests`,
 );
 console.log(
-  `Model time per request: median ${(latency.medianMs / 1000).toFixed(1)} s, p90 ${(latency.p90Ms / 1000).toFixed(1)} s`,
+  `Model time per request (all its model calls): median ${(latency.medianMs / 1000).toFixed(1)} s, p90 ${(latency.p90Ms / 1000).toFixed(1)} s`,
 );
 for (const [mode, r] of Object.entries(modes)) {
   console.log(
