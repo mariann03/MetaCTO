@@ -151,6 +151,12 @@ async function ProblemDetail({
               </p>
               <p className="font-medium">{request.title}</p>
               <p className="whitespace-pre-line">{request.description}</p>
+              {request.clarifications.map((c) => (
+                <p key={c.question} className="text-sm">
+                  <span className="text-muted-foreground">{c.question}</span>{" "}
+                  {c.answer}
+                </p>
+              ))}
             </li>
           ))}
         </ul>

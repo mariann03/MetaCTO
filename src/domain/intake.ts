@@ -176,11 +176,18 @@ const statementSchema = z.object({
   statement: z.string(),
 });
 
+/** A clarifying question the submitter answered. */
+export interface Clarification {
+  question: string;
+  answer: string;
+}
+
 interface RequestText {
   id: number;
   authorId: number;
   title: string;
   description: string;
+  clarifications?: Clarification[];
 }
 
 /** Saves the request, then analyzes it into a new Problem; it stays a draft if analysis fails. */
@@ -192,12 +199,21 @@ export async function submitRequest(
   if (await isRateLimited(deps.db, input.authorId))
     return { status: "rate_limited" };
 
+  // A question left blank was skipped: only answers are kept.
+  const clarifications = (input.clarifications ?? [])
+    .map((c) => ({ question: c.question.trim(), answer: c.answer.trim() }))
+    .filter((c) => c.question !== "" && c.answer !== "");
   const [row] = await deps.db
     .insert(requests)
-    .values({ ...input, status: "analyzing", analysisStartedAt: sql`now()` })
+    .values({
+      ...input,
+      clarifications,
+      status: "analyzing",
+      analysisStartedAt: sql`now()`,
+    })
     .returning({ id: requests.id });
   if (!row) throw new Error("Request was not saved");
-  return runSubmission(deps, { id: row.id, ...input });
+  return runSubmission(deps, { id: row.id, ...input, clarifications });
 }
 
 /**
@@ -228,6 +244,7 @@ export async function resubmitDraft(
       authorId: requests.authorId,
       title: requests.title,
       description: requests.description,
+      clarifications: requests.clarifications,
     });
   if (!claimed) return currentOutcome(deps, requestId);
   return runSubmission(deps, claimed);
@@ -741,7 +758,7 @@ export async function analyzeRequest(
     mode,
     abortSignal,
   }: {
-    request: Pick<RequestText, "title" | "description">;
+    request: Pick<RequestText, "title" | "description" | "clarifications">;
     candidates: OfferedCandidate[];
     mode: MatchMode;
     abortSignal?: AbortSignal;
@@ -779,8 +796,20 @@ export async function analyzeRequest(
   return { extraction, match };
 }
 
-function requestMarkup(request: Pick<RequestText, "title" | "description">) {
-  return `<request>\n<title>${escapeMarkup(request.title)}</title>\n<description>${escapeMarkup(request.description)}</description>\n</request>`;
+function requestMarkup(
+  request: Pick<RequestText, "title" | "description" | "clarifications">,
+) {
+  // Only when answered: a request without answers reads exactly as before, so cached
+  // answers for it still replay.
+  const answered = request.clarifications?.length
+    ? `\n<clarifications>\n${request.clarifications
+        .map(
+          (c) =>
+            `<question>${escapeMarkup(c.question)}</question>\n<answer>${escapeMarkup(c.answer)}</answer>`,
+        )
+        .join("\n")}\n</clarifications>`
+    : "";
+  return `<request>\n<title>${escapeMarkup(request.title)}</title>\n<description>${escapeMarkup(request.description)}</description>${answered}\n</request>`;
 }
 
 /** Attaches each candidate's current statement, keeping the similarity order. */

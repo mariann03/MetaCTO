@@ -85,6 +85,7 @@ export async function getProblem(
       id: requests.id,
       title: requests.title,
       description: requests.description,
+      clarifications: requests.clarifications,
       segment: accounts.segment,
     })
     .from(requests)

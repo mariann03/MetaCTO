@@ -182,6 +182,7 @@ describe("getProblem", () => {
           id: expect.any(Number),
           title: "Invoices A",
           description: "Details of the need.",
+          clarifications: [],
           segment: "smb",
         },
         // Priya belongs to no account.
@@ -189,6 +190,7 @@ describe("getProblem", () => {
           id: expect.any(Number),
           title: "Invoices B",
           description: "Details of the need.",
+          clarifications: [],
           segment: null,
         },
       ],
