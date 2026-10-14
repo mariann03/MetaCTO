@@ -387,3 +387,11 @@ Response: Suggested #11 (merge Problems; edit, lock and version statements) as n
 [2026-10-13T08:12:00Z]
 Prompt: /mattpocock-skills:implement #11
 Response: Branch feat/11-merge-lock. PMs merge a duplicate Problem into another (requests and supports move, a supporter of both counted once with their note kept, source deleted, event logged; a decided source is refused), edit and lock statements (PM-authored versions, AI never rewrites a locked statement) and see the version history. Service and E2E tests pass.
+
+[2026-10-14T04:20:00Z]
+Prompt: /mattpocock-skills:implement #16
+Response: Branch feat/16-metrics. Metrics computed in SQL over the event log: deflection, missed duplicates, hands-off, median time to triaged, median time to first update, and the override guardrail for groupings and scores; a PM Metrics page shows them with their counts, plus the latest offline evaluation. Service test computes each metric from a known event log; E2E covers the page.
+
+[2026-10-14T05:00:00Z]
+Prompt: use ms for time variables
+Response: Metrics durations are now milliseconds (Duration.medianMs, computed in SQL from epoch * 1000), formatted on the page with the ms package; the metrics test writes its event log with ms("30m")-style offsets.

@@ -104,9 +104,9 @@ Role switcher (Submitter / PM) instead of auth.
 
 1. **Fewer duplicates** — deflection rate; missed-duplicate rate (AI-created Problems later merged by a PM).
 2. **Less triage effort** — hands-off rate (high-tier attaches never touched by a PM); median time to triaged.
-3. **Faster stakeholder response** — median time from a Problem's first Request to its supporters' first status update.
+3. **Faster stakeholder response** — median time from a Problem's creation (its first Request's analysis) to its supporters' first status update.
 
-Guardrail: **PM override rate** of AI merges, splits and scores. All computed in SQL over `events` on a PM Metrics page. Offline eval numbers serve as the baseline. PostHog deferred (future flags/A-B). LLM tracing via self-hosted **Langfuse v4** (web, worker, Postgres, ClickHouse, Redis, MinIO; ports remapped to avoid clashing with the app) through AI SDK v7 `registerTelemetry` + `@langfuse/otel` in `instrumentation.ts`, enabled only when `LANGFUSE_*` env vars are set.
+Guardrail: **PM override rate** of AI merges, splits and scores. All computed in SQL over `events` on a PM Metrics page. Definitions: deflection = +1s from the submit page ÷ (those + submitted requests); missed duplicates = AI-created Problems a PM merged away, or whose founding request a PM moved into another Problem in review ÷ AI-created Problems; hands-off = high-tier groupings with no PM event on the request ÷ high-tier groupings; time to triaged = median from a request's first submission (resubmitted drafts count once, also for deflection) to the first high-tier grouping or PM review; time to first update = median from a Problem's creation to its first approved customer update; override rates = PM moves, splits and merges ÷ AI grouping decisions (groupings + AI-created Problems), and overridden criteria ÷ scored criteria, each counted once per Problem. Offline eval numbers serve as the baseline. PostHog deferred (future flags/A-B). LLM tracing via self-hosted **Langfuse v4** (web, worker, Postgres, ClickHouse, Redis, MinIO; ports remapped to avoid clashing with the app) through AI SDK v7 `registerTelemetry` + `@langfuse/otel` in `instrumentation.ts`, enabled only when `LANGFUSE_*` env vars are set.
 
 ## Data and evaluation
 
