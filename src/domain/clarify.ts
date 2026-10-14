@@ -42,6 +42,7 @@ export async function askClarifyingQuestions(
     reasoning: "none",
     // The submitter is waiting to submit; past this, nothing is asked.
     abortSignal: AbortSignal.timeout(ASK_TIMEOUT_MS),
+    telemetry: { functionId: "clarifying-questions" },
   });
   if (!output.needMissing) return [];
   const asked = new Set(output.questions.map((q) => q.trim()).filter(Boolean));

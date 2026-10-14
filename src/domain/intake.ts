@@ -627,6 +627,7 @@ export async function refineStatement(
       prompt: `<current_statement>${escapeMarkup(problem.statement)}</current_statement>\n${requestMarkup(request)}`,
       output: Output.object({ schema: statementSchema }),
       reasoning: "none",
+      telemetry: { functionId: "statement-refinement" },
       // Best effort outside the retried pipeline, so the SDK's own retries stay on.
       abortSignal: AbortSignal.timeout(ATTEMPT_TIMEOUT),
     });
@@ -730,6 +731,7 @@ async function analyze(
     value: embeddingText(request),
     maxRetries: 0,
     abortSignal,
+    telemetry: { functionId: "intake-embedding" },
   });
   if (embedding.length !== EMBEDDING_DIMENSIONS)
     throw new Error(
@@ -805,6 +807,7 @@ export async function analyzeRequest(
     }),
     reasoning,
     maxRetries: 0,
+    telemetry: { functionId: "intake-analysis" },
     abortSignal,
   });
   // The output schema depends on askVerdict, so re-read it with precise types (no casts).

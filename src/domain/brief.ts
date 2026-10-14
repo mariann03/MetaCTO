@@ -279,6 +279,7 @@ export async function generateBrief(
       reasoning: "provider-default",
       // A failed run is logged and the PM asks again; retrying a minutes-long run hides that.
       maxRetries: 0,
+      telemetry: { functionId: "decision-brief" },
     });
     const { output } = await agent.generate({
       prompt: `Prepare the decision brief for Problem ${problemId}.`,

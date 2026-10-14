@@ -431,3 +431,15 @@ Response: Merged PR #33 (#14 closed). Suggested #7 (clarifying questions) next; 
 [2026-10-14T06:05:00Z]
 Prompt: /mattpocock-skills:implement #7
 Response: Branch feat/7-clarifying-questions. On Next, a fast-tier call (thinking off) asks up to maxClarifyingQuestions questions when a request names a solution without the need (0 skips the call); each is optional and skippable; answers are stored with the request, shown on the Problem page and added to the intake prompt (unchanged without answers, so cached answers replay); the PM sets the limit (0-3) in Settings. Also fixed the #23 seed to leave a Problem unscored when its scoring is rejected, and restarted it.
+
+[2026-10-14T06:40:00Z]
+Prompt: looks good, merge it
+Response: Merged PR #34 (#7 closed); main updated in the worktree.
+
+[2026-10-14T06:45:00Z]
+Prompt: /mattpocock-skills:implement #17
+Response: Branch feat/17-langfuse. Asked which tracing packages and Langfuse version to use (chose @langfuse/vercel-ai-sdk + @langfuse/otel + @opentelemetry/sdk-node, and langfuse:4). Tracing starts in src/instrumentation.ts only when all LANGFUSE_* vars are set; every AI call is named (intake-analysis, scoring, decision-brief, ...); a local Langfuse stack is in docker-compose.langfuse.yml with non-clashing ports and a pre-created project.
+
+[2026-10-14T06:45:00Z]
+Prompt: merge #35 and do the langfuse check
+Response: Merged PR #35 (#23 closed). Brought feat/17-langfuse up to date, started the local Langfuse 4.58 stack (project created from the init keys), and ran the submit, scoring, decisions, brief and clarify E2E specs against a build with LANGFUSE_* set: 20 traces arrived, with intake-analysis, clarifying-questions, scoring, update-draft-customer/internal and decision-brief (with its get_problem/list_requests tool calls), each with prompt, output, tokens and latency. Named the OTel service.

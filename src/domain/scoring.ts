@@ -110,6 +110,7 @@ export async function scoreProblem({ db, models }: Deps, problemId: number) {
     output: Output.object({ schema: scoringSchema }),
     reasoning: "none",
     maxRetries: 0,
+    telemetry: { functionId: "scoring" },
   });
   const shownIds = new Set(seen.requests.map((r) => r.id));
   for (const criterion of JUDGED)

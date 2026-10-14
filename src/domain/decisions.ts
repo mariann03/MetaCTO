@@ -168,6 +168,7 @@ async function draft({ db, models }: Deps, problemId: number) {
         output: Output.object({ schema: draftSchema }),
         reasoning: "none",
         maxRetries: 0,
+        telemetry: { functionId: `update-draft-${audience}` },
       });
       return { decisionId: latest.id, audience, body: output.body };
     }),
