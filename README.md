@@ -127,7 +127,7 @@ The PM Metrics page computes, in SQL over the event log:
 
 Before real usage, the offline evaluation is the baseline, shown on the same page. On the held-out requests the adopted setup groups 53% of duplicates correctly with 77% precision on the requests it sends to review, keeps 80% of new needs separate, and finds the right Problem among its 3 candidates 76% of the time.
 
-**On real data.** The fixtures are synthetic, so the same setup is also measured on 325 real microsoft/vscode feature requests, 103 of them duplicates its maintainers marked (`bun run eval --dataset vscode`). Their duplicate labels are incomplete, so precision there is a lower bound. VSCODE_RESULTS
+**On real data.** The fixtures are synthetic, so the same setup is also measured on 325 real microsoft/vscode feature requests, 103 of them duplicates its maintainers marked (`bun run eval --dataset vscode`). Their duplicate labels are incomplete, so precision there is a lower bound. On the held-out requests it groups 82% of duplicates correctly, with at least 55% precision on the requests it sends to review, keeps at least 73% of new needs separate, and finds the right Problem among its 3 candidates 90% of the time, at the same 30 s median. Real duplicates are often close restatements, so they are easier to find than the fixtures'. All of the wrong groupings put a request with no duplicate mark into an existing Problem; how many are real mistakes would take hand labeling. Details in `docs/eval-intake-setups.md`.
 
 ## Assumptions
 
