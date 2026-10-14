@@ -106,28 +106,43 @@ describe("computeMetrics", () => {
       ...pm,
       payload: { audience: "internal" },
     });
-    // Problem 10 is scored (three criteria) and one score overridden.
+    // Problem 10 is scored (three criteria) and one score overridden, twice.
     await log("problem_scored", 400, problem(10));
-    await log("score_overridden", 410, problem(10), {
+    for (const at of [410, 420])
+      await log("score_overridden", at, problem(10), {
+        ...pm,
+        payload: { criterion: "urgency" },
+      });
+    // Request 5's analysis fails; resubmitted, it starts Problem 12, which the PM's review
+    // moves into Problem 10: another duplicate the AI missed.
+    await log("request_submitted", 500, request(5), user);
+    await log("analysis_failed", 501, request(5));
+    await log("request_submitted", 600, request(5), user);
+    await log("problem_created", 600, problem(12), {
+      payload: { requestId: 5 },
+    });
+    await log("grouping_overridden", 630, request(5), {
       ...pm,
-      payload: { criterion: "urgency" },
+      payload: { action: "move", fromProblemId: 12, toProblemId: 10 },
     });
 
     expect(await computeMetrics({ db })).toEqual({
-      // 1 of 5 needs was a +1 instead of a new request.
-      deflection: { count: 1, of: 5, rate: 0.2 },
-      // Problem 11 of the 2 the AI created was a duplicate a PM merged.
-      missedDuplicates: { count: 1, of: 2, rate: 0.5 },
+      // 1 of 6 needs was a +1 instead of a new request (request 5 counts once).
+      deflection: { count: 1, of: 6, rate: 1 / 6 },
+      // Of the 3 Problems the AI created, 11 was merged away and 12's request moved out.
+      missedDuplicates: { count: 2, of: 3, rate: 2 / 3 },
       // Of 2 high-tier groupings, request 2 was never touched.
       handsOff: { count: 1, of: 2, rate: 0.5 },
       // Request 1 by the PM's review (30 min), 2 and 3 by a high-tier grouping (1 min each,
-      // even though 3 was moved later); 4 is still waiting for review.
-      timeToTriaged: { count: 3, medianMinutes: 1 },
+      // even though 3 was moved later), 5 by the review 130 min after its first submission;
+      // 4 is still waiting for review.
+      timeToTriaged: { count: 4, medianMinutes: 15.5 },
       // Only Problem 10 has a customer update: its first, 720 minutes after creation.
       timeToFirstUpdate: { count: 1, medianMinutes: 720 },
       overrides: {
-        // The move, out of 4 AI grouping decisions (2 groupings, 2 new Problems).
-        groupings: { count: 1, of: 4, rate: 0.25 },
+        // Two moves and the merge, out of 5 AI grouping decisions (2 groupings, 3 new Problems).
+        groupings: { count: 3, of: 5, rate: 0.6 },
+        // One criterion overridden (twice), of the 3 scored.
         scores: { count: 1, of: 3, rate: 1 / 3 },
       },
     });

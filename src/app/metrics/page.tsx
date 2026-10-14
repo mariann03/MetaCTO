@@ -51,63 +51,40 @@ export default function MetricsPage() {
   );
 }
 
-function RateCard({
+/** One metric: its headline value, and the counts it rests on. */
+function StatCard({
   title,
   description,
   value,
-  unit,
+  detail,
 }: {
   title: string;
   description: string;
-  value: Rate;
-  unit: string;
+  value: string;
+  detail: string;
 }) {
   return (
     <Card aria-label={title}>
       <CardHeader>
         <CardDescription>{title}</CardDescription>
-        <CardTitle className="text-3xl tabular-nums">
-          {percent(value.rate)}
-        </CardTitle>
+        <CardTitle className="text-3xl tabular-nums">{value}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-1 text-muted-foreground text-sm">
-        <p className="tabular-nums">
-          {value.count} of {value.of} {unit}
-        </p>
+        <p className="tabular-nums">{detail}</p>
         <p>{description}</p>
       </CardContent>
     </Card>
   );
 }
 
-function DurationCard({
-  title,
-  description,
-  value,
-  unit,
-}: {
-  title: string;
-  description: string;
-  value: Duration;
-  unit: string;
-}) {
-  return (
-    <Card aria-label={title}>
-      <CardHeader>
-        <CardDescription>{title}</CardDescription>
-        <CardTitle className="text-3xl tabular-nums">
-          {duration(value.medianMinutes)}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-1 text-muted-foreground text-sm">
-        <p className="tabular-nums">
-          Median over {value.count} {unit}
-        </p>
-        <p>{description}</p>
-      </CardContent>
-    </Card>
-  );
-}
+const rateCard = (value: Rate, unit: string) => ({
+  value: percent(value.rate),
+  detail: `${value.count} of ${value.of} ${unit}`,
+});
+const durationCard = (value: Duration, unit: string) => ({
+  value: duration(value.medianMinutes),
+  detail: `Median over ${value.count} ${unit}`,
+});
 
 async function Metrics() {
   const { current } = await getSession();
@@ -126,62 +103,55 @@ async function Metrics() {
       <section className="space-y-3">
         <h2 className="font-semibold text-lg">Fewer duplicates</h2>
         <div className="grid gap-4 sm:grid-cols-2">
-          <RateCard
+          <StatCard
             title="Deflection rate"
             description="Needs met with a +1 on the submit page instead of a new request."
-            value={m.deflection}
-            unit="needs"
+            {...rateCard(m.deflection, "needs")}
           />
-          <RateCard
+          <StatCard
             title="Missed-duplicate rate"
-            description="Problems the AI created that a PM later merged into another."
-            value={m.missedDuplicates}
-            unit="AI-created problems"
+            description="Problems the AI created that a PM later merged away or emptied in review."
+            {...rateCard(m.missedDuplicates, "AI-created problems")}
           />
         </div>
       </section>
       <section className="space-y-3">
         <h2 className="font-semibold text-lg">Less triage effort</h2>
         <div className="grid gap-4 sm:grid-cols-2">
-          <RateCard
+          <StatCard
             title="Hands-off rate"
             description="Confident AI groupings no PM had to touch."
-            value={m.handsOff}
-            unit="high-confidence groupings"
+            {...rateCard(m.handsOff, "high-confidence groupings")}
           />
-          <DurationCard
+          <StatCard
             title="Time to triaged"
             description="From submission to a confident AI grouping or a PM's review."
-            value={m.timeToTriaged}
-            unit="triaged requests"
+            {...durationCard(m.timeToTriaged, "triaged requests")}
           />
         </div>
       </section>
       <section className="space-y-3">
         <h2 className="font-semibold text-lg">Faster stakeholder response</h2>
         <div className="grid gap-4 sm:grid-cols-2">
-          <DurationCard
+          <StatCard
             title="Time to first update"
-            description="From a problem's first request to its supporters' first status update."
-            value={m.timeToFirstUpdate}
-            unit="problems with an update"
+            description="From a problem's creation to its supporters' first status update."
+            {...durationCard(m.timeToFirstUpdate, "problems with an update")}
           />
         </div>
       </section>
       <section className="space-y-3">
         <h2 className="font-semibold text-lg">Guardrail: PM overrides</h2>
         <div className="grid gap-4 sm:grid-cols-2">
-          <RateCard
+          <StatCard
             title="Grouping override rate"
-            description="AI groupings a PM moved or split."
-            value={m.overrides.groupings}
-            unit="AI grouping decisions"
+            description="AI groupings a PM moved or split, and Problems a PM merged."
+            {...rateCard(m.overrides.groupings, "AI grouping decisions")}
           />
-          <RateCard
+          <StatCard
             title="Score override rate"
             description="AI scores a PM overrode."
-            value={m.overrides.scores}
-            unit="AI scores"
+            {...rateCard(m.overrides.scores, "AI scores")}
           />
         </div>
       </section>
