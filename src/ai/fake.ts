@@ -47,6 +47,40 @@ const fakeGenerate: Generate = async ({ prompt }) => {
   if (text.includes("<current_statement>"))
     return jsonResult({ changed: false, statement: "" });
 
+  // Decision brief: read the Problem and its requests, then cite them.
+  if (text.includes("decision brief")) {
+    if (!text.includes("tool-result"))
+      return {
+        ...jsonResult({}),
+        content: ["get_problem", "list_requests"].map((toolName, i) => ({
+          type: "tool-call" as const,
+          toolCallId: `fake-${i}`,
+          toolName,
+          input: "{}",
+        })),
+        finishReason: { unified: "tool-calls", raw: undefined },
+      };
+    // From the tool results, which come after the instructions' example ids.
+    const results = text.slice(text.indexOf("tool-result"));
+    const problem = /problem:\d+/.exec(results)?.[0] ?? "";
+    const request = /request:\d+/.exec(results)?.[0] ?? "";
+    const cites = (claim: string, source: string) => ({
+      text: claim,
+      sources: [source],
+    });
+    return jsonResult({
+      statement: cites("Fake brief statement.", problem),
+      whoIsAsking: [cites("Fake: who is asking.", problem)],
+      quotes: [{ quote: "Fake quote.", source: request }],
+      scores: [cites("Fake: not scored yet.", problem)],
+      options: [
+        cites("Fake option one.", request),
+        cites("Fake option two.", problem),
+      ],
+      risks: [cites("Fake risk.", request)],
+    });
+  }
+
   // Update drafts: the internal one is the only call shown the accounts.
   if (text.includes("<decision>"))
     return jsonResult({

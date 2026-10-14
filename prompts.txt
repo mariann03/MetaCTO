@@ -395,3 +395,11 @@ Response: Branch feat/16-metrics. Metrics computed in SQL over the event log: de
 [2026-10-14T05:00:00Z]
 Prompt: use ms for time variables
 Response: Metrics durations are now milliseconds (Duration.medianMs, computed in SQL from epoch * 1000), formatted on the page with the ms package; the metrics test writes its event log with ms("30m")-style offsets.
+
+[2026-10-14T05:10:00Z]
+Prompt: looking good, merge it and check whats next
+Response: Merged PR #32 (#16 closed). Suggested #14 (decision brief agent) next; remaining after it: #7, #17, #19, #18.
+
+[2026-10-14T05:20:00Z]
+Prompt: /mattpocock-skills:implement #14
+Response: Branch feat/14-brief-agent. Decision brief agent: a ToolLoopAgent (reasoning model, thinking on, 8-step cap) with six read-only tools bound to the Problem, structured output where every claim cites source ids the tools returned (anything else rejects the brief), stored per Problem and generated in the background; the PM view renders it with linked sources. Service tests cover tool use, citations, the step cap and that no data changes; E2E covers generating a brief.
