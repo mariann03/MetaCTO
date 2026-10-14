@@ -432,6 +432,10 @@ Response: Merged PR #33 (#14 closed). Suggested #7 (clarifying questions) next; 
 Prompt: /mattpocock-skills:implement #7
 Response: Branch feat/7-clarifying-questions. On Next, a fast-tier call (thinking off) asks up to maxClarifyingQuestions questions when a request names a solution without the need (0 skips the call); each is optional and skippable; answers are stored with the request, shown on the Problem page and added to the intake prompt (unchanged without answers, so cached answers replay); the PM sets the limit (0-3) in Settings. Also fixed the #23 seed to leave a Problem unscored when its scoring is rejected, and restarted it.
 
+[2026-10-14T06:30:00Z]
+Prompt: vercel + neon is for the "production build" the tunnel is just for the demo. we are not using vercel + neon right now but the app should be able to use that setup later
+Response: Checked the app is ready for Vercel + Neon (pooled/direct URLs, attachDatabasePool, pgvector via migration; hosted models and per-model thresholds are configuration). Added a Deploying section to the README (production path steps, and the demo via the local build behind the Cloudflare Tunnel) and updated the design doc's infra line.
+
 [2026-10-14T06:40:00Z]
 Prompt: looks good, merge it
 Response: Merged PR #34 (#7 closed); main updated in the worktree.
@@ -443,3 +447,15 @@ Response: Branch feat/17-langfuse. Asked which tracing packages and Langfuse ver
 [2026-10-14T06:45:00Z]
 Prompt: merge #35 and do the langfuse check
 Response: Merged PR #35 (#23 closed). Brought feat/17-langfuse up to date, started the local Langfuse 4.58 stack (project created from the init keys), and ran the submit, scoring, decisions, brief and clarify E2E specs against a build with LANGFUSE_* set: 20 traces arrived, with intake-analysis, clarifying-questions, scoring, update-draft-customer/internal and decision-brief (with its get_problem/list_requests tool calls), each with prompt, output, tokens and latency. Named the OTel service.
+
+[2026-10-14T07:10:00Z]
+Prompt: can we do something else in the meanwhile?
+Response: Committed the #17 work in progress and drafted the README on feat/18-readme (local setup, architecture, AI design decisions, human-in-the-loop points, metrics, assumptions, risks and trade-offs), which needs no models while the seed runs. Deploy and #19 wait on decisions.
+
+[2026-10-14T07:40:00Z]
+Prompt: is there anything else we can run in parallel?
+Response: While the vscode eval runs, refreshed the #18 README against main in a separate worktree (../MetaCTO-18) and offered a Loom demo script; listed the pending decisions (Cloudflare Access, keeping the demo up as services, stopping the Langfuse stack).
+
+[2026-10-14T07:55:00Z]
+Prompt: (chose: Loom demo script, Cloudflare Access on demo, stop Langfuse stack, add package.json scripts to start/stop Langfuse)
+Response: Stopped the Langfuse stack; gave the compose file a fixed project name and added bun run langfuse:up / langfuse:down (tried both); wrote docs/demo-script.md, a ~10 minute walkthrough on the seeded data with prep steps; listed the Cloudflare Access dashboard steps (cloudflared's login cannot create Access apps).
