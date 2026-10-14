@@ -6,7 +6,7 @@ A walkthrough of about 10 minutes on the seeded data (Ledgerly, a finance and in
 
 - `bun run seed` for a clean database (a minute, offline), then `bun run build && bun run start`, or use https://metacto.mariann.dev.
 - Warm the models so the first call doesn't include loading them: `ollama run gemma4:12b "hi"` and `ollama run qwen3.6:27b "hi"`. Both need about 50 GB together; on a 36 GB machine, warm only the one the next step uses.
-- **Generate the brief ahead of time** (step 7): as a PM, open Problem 1 and press *Generate brief*. It takes a few minutes with thinking on.
+- **Generate the brief ahead of time** (step 7): as a PM, open Problem 1 and press *Generate brief*. It takes about 7 minutes on qwen3.6:27b; reload the page to see it.
 - Optional, for step 10: `bun run langfuse:up`, set the three `LANGFUSE_*` lines in `.env`, restart the app.
 
 ## 1. The problem (30 s)
@@ -31,11 +31,11 @@ Still as Maria, write a solution with no reason:
 
 Press **Next**. A clarifying question appears: the request names a solution but not the need. Answer it, e.g. `Approvers miss bills waiting for them; we want a ping in Slack when a bill needs approval.` Then press **Submit request**.
 
-The analysis runs with thinking on, taking about 30 s. That's the trade-off the eval chose: 11–19 points more duplicates grouped (see step 9). The result says where the request went and its confidence tier. A medium grouping is attached *and* sent to a PM. The answer is stored with the request and shown on its Problem page.
+The analysis runs with thinking on, taking about 30 s. That's the trade-off the eval chose: 11–19 points more duplicates grouped (see step 9). The result says where the request went. In our run it started a new Problem (approvers missing bills that wait for them); with thinking on it may instead join the bill-approval Problem, which is then sent to a PM to review. The answer is stored with the request and shown on its Problem page.
 
 ## 4. Explore and the Problem page (1 min)
 
-Open **Explore** and search `supplier payment fraud`. This is semantic search, so it finds the audit-trail Problem without sharing its words. Then filter by status.
+Open **Explore** and search `see who edited a supplier record`. This is semantic search, so the audit-trail Problem comes first without sharing its words. Then pick a status and press **Search** to filter.
 
 Open the Problem and show:
 
@@ -49,9 +49,11 @@ Open the Problem and show:
 
 Switch to **Alex Moreno** (PM). Open **Review**.
 
-- **"Who changed this vendor's bank details?"** (medium). Show the verdict, the rationale and the candidates with their similarity. **Accept** it: the grouping stands, and the statement may be refined.
-- **"Forward receipts to an email address"** (low). The AI started a new Problem for it, but the receipts Problem ("…capturing and submitting purchase receipts…", Problem 11) already existed: a missed duplicate. **Move** it there. The emptied Problem is deleted, and the Metrics page counts a missed duplicate.
-- **"bills workflow"** (low, deliberately vague) is a different case. It founded the bill-approval Problem (2), which 18 later requests joined, so **Accept** it as new.
+The queue shows the oldest 25 items; each is labeled *Review grouping*, *Signals disagree* (the model and the similarity disagree) or *New problem*.
+
+- **"Who changed this vendor's bank details?"** (*Signals disagree*: the model says same problem at similarity 0.44). Show the verdict, the rationale and the candidates with their similarity. **Accept** it: the grouping stands, and the statement may be refined.
+- **"Export for our auditors"** was grouped into the bill-controls Problem, but it asks for an audit trail. **Move** it to the audit-trail Problem ("Customers in regulated industries…"). The move is an override event on the Metrics page.
+- **"bills workflow"** (*New problem*, deliberately vague) founded the bill-approval Problem (2), which 18 later requests joined, so **Accept** it as new.
 
 Mention that every move and split is an override event: the guardrail on the Metrics page.
 
