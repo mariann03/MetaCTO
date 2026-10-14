@@ -92,6 +92,52 @@ describe("withResponseCache", () => {
     expect(language.doGenerateCalls).toHaveLength(1);
   });
 
+  test("reports how long each call took live, also when answered from the store", async () => {
+    const slow = new MockLanguageModelV4({
+      provider: "test",
+      modelId: "slow",
+      doGenerate: async () => {
+        await Bun.sleep(30);
+        return jsonResult({ ok: true });
+      },
+    });
+    const m = { ...models().models, intake: slow };
+    const times: number[] = [];
+    const cached = withResponseCache(m, memoryStore(), (ms) => times.push(ms));
+
+    await generateText({ model: cached.intake, prompt: "hi" });
+    await generateText({ model: cached.intake, prompt: "hi" });
+    await embed({ model: cached.embedding, value: "invoice" });
+
+    expect(times).toHaveLength(3);
+    expect(times[0]).toBeGreaterThanOrEqual(30);
+    // The replay reports the live call's time, not its own.
+    expect(times[1]).toBe(times[0] ?? -1);
+    expect(slow.doGenerateCalls).toHaveLength(1);
+  });
+
+  test("an entry stored without its time is fetched again", async () => {
+    const { language, models: m } = models();
+    const store = memoryStore();
+    await generateText({
+      model: withResponseCache(m, store).intake,
+      prompt: "hi",
+    });
+    const untimed = Object.fromEntries(
+      Object.entries(store.dump()).map(([key, value]) => {
+        const { ms: _, ...rest } = value as { ms?: number };
+        return [key, rest];
+      }),
+    );
+
+    await generateText({
+      model: withResponseCache(m, memoryStore(untimed)).intake,
+      prompt: "hi",
+    });
+
+    expect(language.doGenerateCalls).toHaveLength(2);
+  });
+
   test("the cached model keeps the provider and model id it wraps", () => {
     const { models: m } = models();
     const cached = withResponseCache(m, memoryStore());

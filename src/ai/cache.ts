@@ -23,28 +23,47 @@ function keyOf(
 /**
  * Answers repeated model calls from `store`, keyed by model and request parameters.
  * Only the JSON-safe parts of a response are kept, so the store can live on disk.
+ * Each entry also keeps how long the live call took, reported to `onTime` on every call
+ * (live or replayed), so a replayed eval still measures latency. An entry without a time
+ * (stored before times were kept) is fetched again.
  */
 export function withResponseCache(
   models: Models,
   store: ResponseStore,
+  onTime: (ms: number) => void = () => {},
 ): Models {
+  async function cached<T extends object>(
+    key: string,
+    call: () => Promise<T>,
+  ): Promise<T> {
+    // Trusted: only this middleware writes these entries.
+    const hit = store.get(key) as (T & { ms?: number }) | undefined;
+    if (hit?.ms !== undefined) {
+      const { ms, ...response } = hit;
+      onTime(ms);
+      return response as T;
+    }
+    const start = performance.now();
+    const response = await call();
+    const ms = Math.round(performance.now() - start);
+    store.set(key, { ...response, ms });
+    onTime(ms);
+    return response;
+  }
+
   const language = (model: Models["intake"]) =>
     wrapLanguageModel({
       model,
       middleware: {
-        wrapGenerate: async ({ doGenerate, params, model: inner }) => {
-          const key = keyOf("generate", inner, {
-            ...params,
-            abortSignal: undefined,
-          });
-          const hit = store.get(key);
-          // Trusted: only this middleware writes these entries.
-          if (hit) return hit as Awaited<ReturnType<typeof doGenerate>>;
-          const { content, finishReason, usage, warnings } = await doGenerate();
-          const kept = { content, finishReason, usage, warnings };
-          store.set(key, kept);
-          return kept;
-        },
+        wrapGenerate: ({ doGenerate, params, model: inner }) =>
+          cached(
+            keyOf("generate", inner, { ...params, abortSignal: undefined }),
+            async () => {
+              const { content, finishReason, usage, warnings } =
+                await doGenerate();
+              return { content, finishReason, usage, warnings };
+            },
+          ),
       },
     });
 
@@ -54,19 +73,14 @@ export function withResponseCache(
     embedding: wrapEmbeddingModel({
       model: models.embedding,
       middleware: {
-        wrapEmbed: async ({ doEmbed, params, model: inner }) => {
-          const key = keyOf("embed", inner, {
-            ...params,
-            abortSignal: undefined,
-          });
-          const hit = store.get(key);
-          // Trusted: only this middleware writes these entries.
-          if (hit) return hit as Awaited<ReturnType<typeof doEmbed>>;
-          const { embeddings, usage, warnings } = await doEmbed();
-          const kept = { embeddings, usage, warnings };
-          store.set(key, kept);
-          return kept;
-        },
+        wrapEmbed: ({ doEmbed, params, model: inner }) =>
+          cached(
+            keyOf("embed", inner, { ...params, abortSignal: undefined }),
+            async () => {
+              const { embeddings, usage, warnings } = await doEmbed();
+              return { embeddings, usage, warnings };
+            },
+          ),
       },
     }),
   };

@@ -1,10 +1,19 @@
 {
-  "runAt": "2026-10-12T11:15:04.659Z",
+  "runAt": "2026-10-14T03:12:03.960Z",
   "embeddingModel": "ollama:bge-m3",
   "intakeModel": "ollama:gemma4:12b",
+  "prompt": "eb38391c",
+  "setup": {
+    "candidates": 3,
+    "reasoning": "none"
+  },
   "requests": 150,
-  "analyzed": 150,
-  "retrievalRecall": 0.7580645161290323,
+  "analyzed": 149,
+  "retrievalRecall": 0.7560975609756098,
+  "latency": {
+    "medianMs": 14454,
+    "p90Ms": 18791
+  },
   "modes": {
     "hybrid": {
       "thresholds": {
@@ -21,40 +30,40 @@
           "precision": null
         },
         "medium": {
-          "count": 42,
-          "correct": 26,
-          "precision": 0.6190476190476191
+          "count": 58,
+          "correct": 35,
+          "precision": 0.603448275862069
         },
         "low": {
-          "count": 58,
-          "correct": 15,
-          "precision": 0.25862068965517243
+          "count": 42,
+          "correct": 12,
+          "precision": 0.2857142857142857
         },
         "highRecall": 0,
-        "attachRecall": 0.3291139240506329,
-        "newRecall": 0.7142857142857143
+        "attachRecall": 0.4430379746835443,
+        "newRecall": 0.5714285714285714
       },
       "holdout": {
-        "requests": 50,
-        "attachable": 45,
+        "requests": 49,
+        "attachable": 44,
         "high": {
           "count": 1,
           "correct": 1,
           "precision": 1
         },
         "medium": {
-          "count": 17,
-          "correct": 12,
-          "precision": 0.7058823529411765
+          "count": 32,
+          "correct": 18,
+          "precision": 0.5625
         },
         "low": {
-          "count": 32,
-          "correct": 4,
+          "count": 16,
+          "correct": 2,
           "precision": 0.125
         },
-        "highRecall": 0.022222222222222223,
-        "attachRecall": 0.28888888888888886,
-        "newRecall": 0.8
+        "highRecall": 0.022727272727272728,
+        "attachRecall": 0.4318181818181818,
+        "newRecall": 0.4
       }
     },
     "similarity-only": {
@@ -86,17 +95,17 @@
         "newRecall": 0.6666666666666666
       },
       "holdout": {
-        "requests": 50,
-        "attachable": 45,
+        "requests": 49,
+        "attachable": 44,
         "high": {
           "count": 0,
           "correct": 0,
           "precision": null
         },
         "medium": {
-          "count": 41,
+          "count": 40,
           "correct": 18,
-          "precision": 0.43902439024390244
+          "precision": 0.45
         },
         "low": {
           "count": 9,
@@ -104,7 +113,7 @@
           "precision": 0.2222222222222222
         },
         "highRecall": 0,
-        "attachRecall": 0.4,
+        "attachRecall": 0.4090909090909091,
         "newRecall": 0.4
       }
     }

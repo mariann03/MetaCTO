@@ -1,0 +1,121 @@
+{
+  "runAt": "2026-10-14T03:12:03.960Z",
+  "embeddingModel": "ollama:bge-m3",
+  "intakeModel": "ollama:gemma4:12b",
+  "prompt": "eb38391c",
+  "setup": {
+    "candidates": 3,
+    "reasoning": "none"
+  },
+  "requests": 150,
+  "analyzed": 149,
+  "retrievalRecall": 0.7560975609756098,
+  "latency": {
+    "medianMs": 14454,
+    "p90Ms": 18791
+  },
+  "modes": {
+    "hybrid": {
+      "thresholds": {
+        "low": 0.5,
+        "high": 0.75,
+        "basis": "provisional"
+      },
+      "train": {
+        "requests": 100,
+        "attachable": 79,
+        "high": {
+          "count": 0,
+          "correct": 0,
+          "precision": null
+        },
+        "medium": {
+          "count": 58,
+          "correct": 35,
+          "precision": 0.603448275862069
+        },
+        "low": {
+          "count": 42,
+          "correct": 12,
+          "precision": 0.2857142857142857
+        },
+        "highRecall": 0,
+        "attachRecall": 0.4430379746835443,
+        "newRecall": 0.5714285714285714
+      },
+      "holdout": {
+        "requests": 49,
+        "attachable": 44,
+        "high": {
+          "count": 1,
+          "correct": 1,
+          "precision": 1
+        },
+        "medium": {
+          "count": 32,
+          "correct": 18,
+          "precision": 0.5625
+        },
+        "low": {
+          "count": 16,
+          "correct": 2,
+          "precision": 0.125
+        },
+        "highRecall": 0.022727272727272728,
+        "attachRecall": 0.4318181818181818,
+        "newRecall": 0.4
+      }
+    },
+    "similarity-only": {
+      "thresholds": {
+        "low": 0.58,
+        "high": 0.85,
+        "basis": "provisional"
+      },
+      "train": {
+        "requests": 100,
+        "attachable": 79,
+        "high": {
+          "count": 0,
+          "correct": 0,
+          "precision": null
+        },
+        "medium": {
+          "count": 76,
+          "correct": 31,
+          "precision": 0.40789473684210525
+        },
+        "low": {
+          "count": 24,
+          "correct": 14,
+          "precision": 0.5833333333333334
+        },
+        "highRecall": 0,
+        "attachRecall": 0.3924050632911392,
+        "newRecall": 0.6666666666666666
+      },
+      "holdout": {
+        "requests": 49,
+        "attachable": 44,
+        "high": {
+          "count": 0,
+          "correct": 0,
+          "precision": null
+        },
+        "medium": {
+          "count": 40,
+          "correct": 18,
+          "precision": 0.45
+        },
+        "low": {
+          "count": 9,
+          "correct": 2,
+          "precision": 0.2222222222222222
+        },
+        "highRecall": 0,
+        "attachRecall": 0.4090909090909091,
+        "newRecall": 0.4
+      }
+    }
+  }
+}
