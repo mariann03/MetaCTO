@@ -3,14 +3,18 @@
 // data/eval/latest.json (shown on the metrics page) and data/eval/thresholds.json (used by
 // intake, keyed by embedding model). Model answers are cached in data/cache.
 //   bun run eval [--intake-model ollama:qwen3.6:27b] [--candidates 5] [--reasoning provider-default]
-// Without flags it measures the setup intake runs with: INTAKE_MODEL and INTAKE_SETUP.
+//                [--dataset vscode]
+// Without flags it measures the setup intake runs with: INTAKE_MODEL and INTAKE_SETUP, on the
+// fixtures. --dataset vscode measures it on real vscode feature requests instead; their
+// duplicate labels are incomplete, so precision there is a lower bound, and those runs never
+// change what intake runs with.
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
 import { z } from "zod";
 import { createCachedModels } from "@/ai/cached-models";
 import { embeddingModelName } from "@/ai/models";
-import { loadRequestFixtures } from "@/db/fixtures";
+import { DATASETS, loadRequestFixtures } from "@/db/fixtures";
 import {
   collectObservations,
   type Metrics,
@@ -35,6 +39,7 @@ const { values: flags } = parseArgs({
     "intake-model": { type: "string" },
     candidates: { type: "string" },
     reasoning: { type: "string" },
+    dataset: { type: "string" },
   },
 });
 const appEnv = readEnv();
@@ -57,8 +62,13 @@ const setup: IntakeSetup = z
     ]),
   })
   .parse({ ...INTAKE_SETUP, ...flags });
+const dataset = z.enum(DATASETS).default("fixtures").parse(flags.dataset);
 const setupName = `prompt=${INTAKE_PROMPT_ID} candidates=${setup.candidates} reasoning=${setup.reasoning}`;
+// The fixtures keep their unprefixed names, so earlier runs and cached answers still match.
+const datasetPrefix = dataset === "fixtures" ? "" : `${dataset} `;
+const runName = `${datasetPrefix}${setupName}`;
 const isIntakeSetup =
+  dataset === "fixtures" &&
   env.INTAKE_MODEL === appEnv.INTAKE_MODEL &&
   setup.candidates === INTAKE_SETUP.candidates &&
   setup.reasoning === INTAKE_SETUP.reasoning;
@@ -66,10 +76,10 @@ const isIntakeSetup =
 // Model time of the current request (every model call it made: embedding, intake, failed
 // attempts): what it took live, even when replayed from the cache.
 let requestMs = 0;
-const { models, save } = createCachedModels(env, `eval ${setupName}`, (ms) => {
+const { models, save } = createCachedModels(env, `eval ${runName}`, (ms) => {
   requestMs += ms;
 });
-const fixtures = await loadRequestFixtures();
+const fixtures = await loadRequestFixtures(dataset);
 const latencies: number[] = [];
 
 let observations: Observation[];
@@ -122,6 +132,10 @@ const latency = { medianMs: percentile(0.5), p90Ms: percentile(0.9) };
 console.log(
   `\nEmbedding ${embeddingModel}, intake ${env.INTAKE_MODEL}, ${setupName}; ${observations.length}/${fixtures.length} requests analyzed`,
 );
+if (dataset !== "fixtures")
+  console.log(
+    `Dataset ${dataset}: duplicate labels are incomplete, so every precision below is a lower bound.`,
+  );
 console.log(
   `Retrieval: the right Problem was among the ${setup.candidates} candidates for ${pct(retrieval)} of groupable requests`,
 );
@@ -141,6 +155,7 @@ const results = `${JSON.stringify(
     runAt: new Date().toISOString(),
     embeddingModel,
     intakeModel: env.INTAKE_MODEL,
+    dataset,
     prompt: INTAKE_PROMPT_ID,
     setup,
     requests: fixtures.length,
@@ -153,7 +168,10 @@ const results = `${JSON.stringify(
   2,
 )}\n`;
 const evalDir = join(process.cwd(), "data", "eval");
-const runFile = `${env.INTAKE_MODEL} ${setupName}`.replace(/[^\w.=-]+/g, "_");
+const runFile = `${datasetPrefix}${env.INTAKE_MODEL} ${setupName}`.replace(
+  /[^\w.=-]+/g,
+  "_",
+);
 mkdirSync(join(evalDir, "runs"), { recursive: true });
 writeFileSync(join(evalDir, "runs", `${runFile}.json`), results);
 console.log(`\nWrote data/eval/runs/${runFile}.json`);
