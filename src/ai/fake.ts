@@ -89,8 +89,10 @@ export function createFakeModels(): Models {
     embedding: new MockEmbeddingModelV4({
       provider: "fake",
       modelId: "fake-embedding",
+      // Only the title counts (the text before the blank line), as in the fake analysis,
+      // so searching Explore for a request's title finds it.
       doEmbed: async ({ values }) => ({
-        embeddings: values.map(fakeEmbedding),
+        embeddings: values.map((v) => fakeEmbedding(v.split("\n\n")[0] ?? v)),
         warnings: [],
       }),
     }),
