@@ -1,5 +1,5 @@
 {
-  "runAt": "2026-10-14T01:40:30.883Z",
+  "runAt": "2026-10-14T04:00:59.763Z",
   "embeddingModel": "ollama:bge-m3",
   "intakeModel": "ollama:gemma4:12b",
   "prompt": "edb47c00",

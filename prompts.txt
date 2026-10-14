@@ -387,3 +387,7 @@ Response: Branch feat/23-duplicate-recall. Made the eval compare intake setups: 
 [2026-10-13T09:05:00Z]
 Prompt: continue now
 Response: Resumed the #23 evals: qwen3.6:27b alone (nothing else loaded in Ollama), then gemma with reasoning on, then the prompt variant.
+
+[2026-10-14T00:30:00Z]
+Prompt: (chose "gemma, thinking on" for #23's intake setup)
+Response: Adopted gemma4:12b with thinking on for intake (INTAKE_SETUP reasoning provider-default) and raised the per-attempt timeout to 2 minutes; reverted both prompt variants. Replayed the eval for latest.json, wrote docs/eval-intake-setups.md with the comparison and trade-off, corrected the latency claims in the design doc, and started the re-seed (live intake with thinking on, then qwen scores).
