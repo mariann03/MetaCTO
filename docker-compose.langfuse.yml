@@ -1,7 +1,8 @@
 # Optional, local tracing: self-hosted Langfuse v4 (web, worker, Postgres, ClickHouse,
 # Redis, MinIO), adapted from Langfuse's own docker-compose.yml.
 #   docker compose -f docker-compose.langfuse.yml up -d   # UI on http://localhost:3001
-# Ports avoid the app's: the UI is on 3001 and MinIO on 9092; the rest stay inside Docker.
+# Ports avoid the app's: the UI is on 3001 and MinIO on 9092, both bound to this machine
+# only (traces hold customer text); the rest stay inside Docker.
 # The secrets below are local-only placeholders; never reuse them on a reachable host.
 # A project with the keys in .env.example is created on first start (login: dev@example.com).
 x-langfuse-env: &langfuse-env
@@ -55,7 +56,7 @@ services:
     restart: unless-stopped
     depends_on: *langfuse-depends-on
     ports:
-      - "3001:3000"
+      - "127.0.0.1:3001:3000"
     environment:
       <<: *langfuse-env
       NEXTAUTH_SECRET: local-nextauth-secret
@@ -99,7 +100,7 @@ services:
       MINIO_ROOT_USER: minio
       MINIO_ROOT_PASSWORD: miniosecret
     ports:
-      - "9092:9000"
+      - "127.0.0.1:9092:9000"
     volumes:
       - langfuse_minio_data:/data
     healthcheck:

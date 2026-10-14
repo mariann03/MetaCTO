@@ -43,7 +43,10 @@ const envSchema = z
 /** Validated runtime configuration; model ids are typed `provider:model` strings. */
 export type Env = z.infer<typeof envSchema>;
 
-/** Tracing is on only when Langfuse is fully configured; otherwise nothing is registered. */
+/**
+ * Tracing is on only when Langfuse is fully configured; otherwise nothing is registered.
+ * One key suffices: the schema refuses a partial set, so all three are there.
+ */
 export const tracingEnabled = (env: Env) =>
   env.LANGFUSE_PUBLIC_KEY !== undefined;
 

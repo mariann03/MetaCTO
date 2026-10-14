@@ -731,6 +731,7 @@ async function analyze(
     value: embeddingText(request),
     maxRetries: 0,
     abortSignal,
+    telemetry: { functionId: "intake-embedding" },
   });
   if (embedding.length !== EMBEDDING_DIMENSIONS)
     throw new Error(

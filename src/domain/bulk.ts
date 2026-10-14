@@ -66,6 +66,7 @@ export async function reembedRequests({ db, models }: Deps) {
   const { embeddings } = await embedMany({
     model: models.embedding,
     values: rows.map(embeddingText),
+    telemetry: { functionId: "reembed" },
   });
   const embeddingModel = embeddingModelName(models.embedding);
   await db.transaction(async (tx) => {
