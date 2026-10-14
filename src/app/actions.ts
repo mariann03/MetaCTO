@@ -382,7 +382,7 @@ export async function approveUpdateAction(
 }
 
 export interface StatementState {
-  status: "idle" | "saved" | "invalid" | "forbidden";
+  status: "idle" | "saved" | "missing" | "invalid" | "forbidden";
 }
 
 export async function editStatementAction(
@@ -400,14 +400,14 @@ export async function editStatementAction(
     .safeParse(form.get("statement"));
   if (!statement.success) return { status: "invalid" };
   const id = z.number().int().positive().parse(problemId);
-  await editStatement(deps, {
+  const status = await editStatement(deps, {
     userId: user.id,
     problemId: id,
     statement: statement.data,
     locked: form.get("locked") === "on",
   });
   revalidatePath(`/problems/${id}`);
-  return { status: "saved" };
+  return { status };
 }
 
 export interface MergeState {

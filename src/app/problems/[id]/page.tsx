@@ -21,7 +21,12 @@ import {
 import { getProblem, listProblems } from "@/domain/problems";
 import { JUDGED } from "@/domain/ranking";
 import { getScores } from "@/domain/scoring";
-import { JUDGED_LABELS, type Segment, STATUS_LABELS } from "@/lib/labels";
+import {
+  AUTHOR_LABELS,
+  JUDGED_LABELS,
+  type Segment,
+  STATUS_LABELS,
+} from "@/lib/labels";
 import { plural } from "@/lib/utils";
 import { deps } from "@/server/deps";
 import { getSession } from "@/server/session";
@@ -31,7 +36,6 @@ const DECISION_OPTIONS = DECISIONS.map((value) => ({
   value,
   label: STATUS_LABELS[value],
 }));
-const AUTHOR = { ai: "AI", pm: "PM", user: "Customer" } as const;
 const AUDIENCE = {
   customer: "Customer update (to every supporter)",
   internal: "Internal update (Sales and Customer Success)",
@@ -265,6 +269,7 @@ async function Curation({
   const [locked, versions, all] = await Promise.all([
     isStatementLocked(deps, problemId),
     listVersions(deps, problemId),
+    // ponytail: every Problem fills the picker (71 on the seed); search past a few hundred.
     listProblems(deps, { viewerId }),
   ]);
   const targets = all
@@ -292,7 +297,7 @@ async function Curation({
             <li key={v.id} className="space-y-1 p-3 text-sm">
               <p>{v.statement}</p>
               <p className="text-muted-foreground text-xs">
-                {AUTHOR[v.author]} · {dateFormat.format(v.createdAt)}
+                {AUTHOR_LABELS[v.author]} · {dateFormat.format(v.createdAt)}
               </p>
             </li>
           ))}

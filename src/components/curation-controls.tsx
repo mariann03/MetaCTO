@@ -64,6 +64,11 @@ export function StatementForm({
           Statement saved.
         </p>
       )}
+      {state.status === "missing" && (
+        <p role="alert" className="text-sm">
+          This problem was merged into another. Reload to find it.
+        </p>
+      )}
       {state.status === "invalid" && (
         <p role="alert" className="text-destructive text-sm">
           Write a statement of up to 1,000 characters.

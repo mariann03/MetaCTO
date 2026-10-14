@@ -116,7 +116,12 @@ describe("mergeProblems", () => {
     ).toEqual([
       {
         actorId: people.priya,
-        payload: { sourceId: source.problemId, requests: 1, supports: 1 },
+        payload: {
+          sourceId: source.problemId,
+          sourceStatement: "Statement for Run payroll",
+          requests: 1,
+          supports: 1,
+        },
       },
     ]);
   });
@@ -143,6 +148,54 @@ describe("mergeProblems", () => {
         .from(requests)
         .where(eq(requests.id, source.requestId)),
     ).toEqual([{ problemId: source.problemId }]);
+  });
+
+  test("a request being grouped into a Problem merged away meanwhile starts its own", async () => {
+    const target = await submit("Payroll", people.alice);
+    const source = await submit("Run payroll", people.bob);
+    // While the model judges the new request same as the source, a PM merges the source away.
+    const { models } = scriptedModels({
+      generate: async ({ prompt }) => {
+        const text = JSON.stringify(prompt);
+        if (text.includes("<current_statement>"))
+          return jsonResult({ changed: false, statement: "" });
+        await mergeProblems(
+          { db },
+          {
+            userId: people.priya,
+            sourceId: source.problemId,
+            targetId: target.problemId,
+          },
+        );
+        return jsonResult({
+          problemStatement: "Statement for More payroll",
+          underlyingProblem: "More payroll",
+          proposedSolution: "",
+          persona: "Bookkeeper",
+          severity: "medium",
+          match: {
+            verdict: "same_problem",
+            problemId: source.problemId,
+            rationale: "Same",
+          },
+        });
+      },
+    });
+
+    const result = await submitRequest(
+      { db, models },
+      {
+        authorId: people.alice,
+        title: "More payroll",
+        description: "Details of the need.",
+      },
+    );
+
+    expect(result).toMatchObject({ status: "submitted", tier: "low" });
+    if (result.status !== "submitted") return;
+    expect([source.problemId, target.problemId]).not.toContain(
+      result.problemId,
+    );
   });
 
   test("only a PM merges", async () => {
@@ -224,6 +277,17 @@ describe("editStatement", () => {
       editStatement({ db }, { userId, problemId, statement, locked: false });
 
     await expect(edit(people.alice, "Mine now.")).rejects.toThrow();
+    expect(
+      await editStatement(
+        { db },
+        {
+          userId: people.priya,
+          problemId: 404,
+          statement: "Gone.",
+          locked: false,
+        },
+      ),
+    ).toBe("missing");
     await expect(edit(people.priya, "  ")).rejects.toThrow();
     expect((await listVersions({ db }, problemId)).length).toBe(1);
   });

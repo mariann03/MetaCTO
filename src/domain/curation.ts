@@ -30,7 +30,7 @@ export async function mergeProblems(
   return db.transaction(async (tx) => {
     // Both rows locked in id order, so concurrent merges and decisions wait their turn.
     const locked = await tx
-      .select({ id: problems.id })
+      .select({ id: problems.id, statement: problems.statement })
       .from(problems)
       .where(inArray(problems.id, [sourceId, targetId]))
       .orderBy(asc(problems.id))
@@ -70,7 +70,13 @@ export async function mergeProblems(
       actorId: userId,
       entityType: "problem",
       entityId: targetId,
-      payload: { sourceId, requests: moved.length, supports: kept.length },
+      // The source and its versions are deleted, so its wording is kept here.
+      payload: {
+        sourceId,
+        sourceStatement: locked.find((p) => p.id === sourceId)?.statement,
+        requests: moved.length,
+        supports: kept.length,
+      },
     });
     return "merged";
   });
@@ -88,11 +94,11 @@ export async function editStatement(
     statement,
     locked,
   }: { userId: number; problemId: number; statement: string; locked: boolean },
-) {
+): Promise<"saved" | "missing"> {
   await requirePm({ db }, userId, "edit a statement");
   const text = statement.trim();
   if (!text) throw new Error("A statement cannot be empty");
-  await db.transaction(async (tx) => {
+  return db.transaction(async (tx) => {
     const [current] = await tx
       .select({
         statement: problems.statement,
@@ -101,7 +107,8 @@ export async function editStatement(
       .from(problems)
       .where(eq(problems.id, problemId))
       .for("update");
-    if (!current) throw new Error(`Problem ${problemId} not found`);
+    // Merged away since the PM opened it.
+    if (!current) return "missing";
     await tx
       .update(problems)
       .set({ statement: text, statementLocked: locked })
@@ -123,6 +130,7 @@ export async function editStatement(
     }
     if (locked !== current.locked)
       await record(locked ? "statement_locked" : "statement_unlocked");
+    return "saved";
   });
 }
 
