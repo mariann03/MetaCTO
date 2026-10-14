@@ -27,13 +27,15 @@ Train / holdout. The current prompt is `edb47c00`.
 | Setup | Grouped recall | Medium precision | New kept new | Retrieval | Median / p90 time |
 |---|---|---|---|---|---|
 | gemma4:12b, thinking off (before) | 38% / 42% | 63% / 75% | 67% / 80% | 76% @3 | 11.2 s / 14.1 s |
-| gemma4:12b, 5 candidates | 41% / 47% | 58% / 69% | 67% / 80% | 82% @5 | 12.4 s / 14.8 s |
-| qwen3.6:27b, thinking off | 44% / 41% | 76% / 89% | 75% / 80% | 75% @3 | 21.9 s / 27.5 s |
-| **gemma4:12b, thinking on (adopted)** | **57% / 53%** | **68% / 77%** | **71% / 80%** | 76% @3 | **30.4 s / 77.9 s** |
+| gemma4:12b, 5 candidates | 41% / 47% | 58% / 69% | 67% / 80% | 82% @5 | 12.4 s / 14.6 s |
+| qwen3.6:27b, thinking off | 44% / 41% | 76% / 89% | 75% / 80% | 75% @3 | 21.9 s / 27.4 s |
+| **gemma4:12b, thinking on (adopted)** | **57% / 53%** | **68% / 77%** | **71% / 80%** | 76% @3 | **30.1 s / 74.2 s** |
 | Prompt `4787fccb`: granularity rule | 65% / 69% | 52% / 61% | 5% / 0% | 76% @3 | 14.1 s / 17.7 s |
 | Prompt `eb38391c`: rationale first | 44% / 43% | 60% / 56% | 57% / 40% | 76% @3 | 14.5 s / 18.8 s |
 
 qwen3.6:27b failed to analyze 4 of the 150 requests; the rationale-first prompt failed 1.
+Times are nearest-rank percentiles; the two prompt variants' runs predate that fix (their
+p90 may read one rank high), since their prompts are no longer in the code to replay.
 
 ## What each change did
 
@@ -64,7 +66,7 @@ a PO number field against custom fields. Thinking on is what fixed most of these
 
 Grouping duplicates is the point of the product, so we took recall and paid in latency:
 
-- A submission now waits about 30 s at the median for its analysis, up from 11 s, and 78 s
+- A submission now waits about 30 s at the median for its analysis, up from 11 s, and 74 s
   at p90. The per-attempt timeout went from 1 to 2 minutes so the slow tail completes instead
   of falling back to a draft.
 - Precision did not suffer, so the review queue does not grow with false matches. It grows

@@ -1,5 +1,5 @@
 {
-  "runAt": "2026-10-14T04:00:59.763Z",
+  "runAt": "2026-10-14T06:13:26.812Z",
   "embeddingModel": "ollama:bge-m3",
   "intakeModel": "ollama:gemma4:12b",
   "prompt": "edb47c00",
@@ -11,8 +11,8 @@
   "analyzed": 150,
   "retrievalRecall": 0.7580645161290323,
   "latency": {
-    "medianMs": 30420,
-    "p90Ms": 77865
+    "medianMs": 30094,
+    "p90Ms": 74194
   },
   "modes": {
     "hybrid": {

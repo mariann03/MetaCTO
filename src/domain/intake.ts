@@ -34,7 +34,7 @@ import { getMatchMode, type MatchMode } from "./settings";
 export const SUBMISSIONS_PER_HOUR = 10;
 export const ANALYSIS_ATTEMPTS = 3;
 // Bounds one attempt, so a hung model call fails over to the next attempt or the draft.
-// Thinking on, a verdict takes 30 s at the median and 78 s at p90 (docs/eval-intake-setups.md).
+// Thinking on, a verdict takes 30 s at the median and 74 s at p90 (docs/eval-intake-setups.md).
 const ATTEMPT_TIMEOUT = ms("2m");
 /**
  * How intake matches: how many Problems the model is offered per request, and how much it
