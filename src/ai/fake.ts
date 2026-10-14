@@ -47,6 +47,15 @@ const fakeGenerate: Generate = async ({ prompt }) => {
   if (text.includes("<current_statement>"))
     return jsonResult({ changed: false, statement: "" });
 
+  // Clarifying questions: only a title marked "[solution]" lacks its need.
+  if (text.includes("clarifying questions")) {
+    const needMissing = text.includes("[solution]");
+    return jsonResult({
+      needMissing,
+      questions: needMissing ? ["What are you trying to achieve?"] : [],
+    });
+  }
+
   // Decision brief: read the Problem and its requests, then cite them.
   if (text.includes("decision brief")) {
     if (!text.includes("tool-result"))

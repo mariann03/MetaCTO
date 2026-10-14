@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { z } from "zod";
 import { generateBrief } from "@/domain/brief";
+import { askClarifyingQuestions } from "@/domain/clarify";
 import { editStatement, mergeProblems } from "@/domain/curation";
 import {
   approveUpdate,
@@ -28,7 +29,13 @@ import {
 import { JUDGED } from "@/domain/ranking";
 import { reviewRequest } from "@/domain/review";
 import { overrideScore, rescoreProblem, rescoreStale } from "@/domain/scoring";
-import { MATCH_MODES, setMatchMode, updateStrategy } from "@/domain/settings";
+import {
+  MATCH_MODES,
+  MAX_CLARIFYING_QUESTIONS,
+  setMatchMode,
+  setMaxClarifyingQuestions,
+  updateStrategy,
+} from "@/domain/settings";
 import { deps } from "@/server/deps";
 import { getSession, USER_COOKIE } from "@/server/session";
 
@@ -79,10 +86,29 @@ export async function submitRequestAction(
       fields,
     };
 
+  // Answered clarifying questions only; an empty answer is a skipped question.
+  const questions = form.getAll("question").map(String);
+  const clarifications = z
+    .array(
+      z.object({
+        question: z.string().trim().min(1).max(500),
+        answer: z.string().trim().max(2000),
+      }),
+    )
+    .max(MAX_CLARIFYING_QUESTIONS)
+    .parse(
+      form.getAll("answer").map((answer, i) => ({
+        question: questions[i],
+        answer: String(answer),
+      })),
+    )
+    .filter((c) => c.answer !== "");
+
   const user = await currentUser();
   const result = await submitRequest(deps, {
     authorId: user.id,
     ...parsed.data,
+    clarifications,
   });
   revalidatePath("/my-requests");
   return result.status === "rate_limited" ? { ...result, fields } : result;
@@ -453,4 +479,39 @@ export async function generateBriefAction(
   const id = z.number().int().positive().parse(problemId);
   after(() => generateBrief(deps, { userId: user.id, problemId: id }));
   return { status: "started" };
+}
+
+/** Clarifying questions for the request as written; none when asking fails, so nobody is blocked. */
+export async function askQuestionsAction(
+  title: string,
+  description: string,
+): Promise<string[]> {
+  await currentUser();
+  const text = requestInput.safeParse({ title, description });
+  if (!text.success) return [];
+  return askClarifyingQuestions(deps, text.data).catch((error: unknown) => {
+    console.error("Asking clarifying questions failed", error);
+    return [];
+  });
+}
+
+export interface ClarifyingSettingState {
+  status: "idle" | "saved" | "forbidden";
+}
+
+export async function setMaxClarifyingQuestionsAction(
+  _prev: ClarifyingSettingState,
+  form: FormData,
+): Promise<ClarifyingSettingState> {
+  const user = await currentUser();
+  if (user.role !== "pm") return { status: "forbidden" };
+  const max = z.coerce
+    .number()
+    .int()
+    .min(0)
+    .max(MAX_CLARIFYING_QUESTIONS)
+    .parse(form.get("max"));
+  await setMaxClarifyingQuestions(deps, { userId: user.id, max });
+  revalidatePath("/settings");
+  return { status: "saved" };
 }

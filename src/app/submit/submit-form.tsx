@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useRef, useState } from "react";
 import {
+  askQuestionsAction,
   findMatchesAction,
   type Match,
   type SubmitState,
@@ -20,8 +21,9 @@ const MATCH_MIN_CHARS = 30;
 const MATCH_DEBOUNCE_MS = 500;
 
 /**
- * Two steps: write (matching Problems appear as you type), then Next shows the matches
- * and the submit button. A +1 on a match supports it instead of filing a duplicate.
+ * Two steps: write (matching Problems appear as you type), then Next shows the matches,
+ * any clarifying questions and the submit button. A +1 on a match supports it instead of
+ * filing a duplicate; every question can be skipped.
  */
 export function SubmitForm() {
   const [state, action, pending] = useActionState(submitRequestAction, idle);
@@ -82,6 +84,8 @@ function RequestForm({
       : "write",
   );
   const [matches, setMatches] = useState<Match[] | null>(null);
+  // null while the questions are being asked for.
+  const [questions, setQuestions] = useState<string[] | null>([]);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   // Bumped to discard lookups still in flight: only the latest may show its matches.
   const latest = useRef(0);
@@ -151,6 +155,38 @@ function RequestForm({
             <p className="text-destructive text-sm">{errors.description[0]}</p>
           )}
         </div>
+        {step === "confirm" && questions === null && (
+          <p className="text-muted-foreground text-sm">
+            Checking whether we need anything else…
+          </p>
+        )}
+        {step === "confirm" &&
+          questions?.map((question, i) => (
+            <fieldset
+              key={question}
+              className="space-y-2 rounded-md border p-3"
+            >
+              <input type="hidden" name="question" value={question} />
+              <Label htmlFor={`answer-${i}`}>{question}</Label>
+              <Textarea
+                id={`answer-${i}`}
+                name="answer"
+                rows={2}
+                maxLength={2000}
+                placeholder="Optional: helps us understand what you need"
+              />
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={() =>
+                  setQuestions((qs) => qs?.filter((q) => q !== question) ?? [])
+                }
+              >
+                Skip this question
+              </Button>
+            </fieldset>
+          ))}
         {/* Keyed apart: reusing the Next button as the submit button would submit on Next. */}
         {step === "confirm" ? (
           <Button key="submit" type="submit" disabled={pending}>
@@ -162,7 +198,14 @@ function RequestForm({
             type="button"
             onClick={(e) => {
               const { form } = e.currentTarget;
-              if (form) void match(form);
+              if (form) {
+                void match(form);
+                const { title, description } = formText(form);
+                setQuestions(null);
+                void askQuestionsAction(title, description)
+                  .catch(() => [])
+                  .then(setQuestions);
+              }
               setStep("confirm");
             }}
           >

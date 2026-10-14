@@ -10,9 +10,16 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { thresholdsFor } from "@/domain/intake";
-import { getMatchMode, getStrategy, MATCH_MODES } from "@/domain/settings";
+import {
+  getMatchMode,
+  getMaxClarifyingQuestions,
+  getStrategy,
+  MATCH_MODES,
+  MAX_CLARIFYING_QUESTIONS,
+} from "@/domain/settings";
 import { deps } from "@/server/deps";
 import { getSession } from "@/server/session";
+import { ClarifyingForm } from "./clarifying-form";
 import { MatchModeForm } from "./match-mode-form";
 import { StrategyForm } from "./strategy-form";
 
@@ -42,15 +49,17 @@ async function MatchingSettings() {
       </p>
     );
 
-  const [mode, strategy] = await Promise.all([
+  const [mode, strategy, maxQuestions] = await Promise.all([
     getMatchMode(deps),
     getStrategy(deps),
+    getMaxClarifyingQuestions(deps),
   ]);
   const embeddingModel = embeddingModelName(deps.models.embedding);
   const modes = thresholdsFor(embeddingModel);
   return (
     <div className="space-y-8">
       <StrategyForm strategy={strategy} />
+      <ClarifyingForm max={maxQuestions} limit={MAX_CLARIFYING_QUESTIONS} />
       <MatchModeForm mode={mode} />
       <Table className="-mt-4">
         <TableCaption>
