@@ -25,6 +25,8 @@ import { embeddingText, findCandidates } from "./intake";
 
 export const PROBLEM_STATUSES = problemStatus.enumValues;
 export type ProblemStatus = (typeof PROBLEM_STATUSES)[number];
+/** Decided Problems no longer compete for priority; planned ones still do. */
+export const DECIDED: ProblemStatus[] = ["shipped", "declined"];
 // ponytail: a fixed page of results; paginate when people need more than the closest few.
 const SEARCH_RESULTS = 10;
 

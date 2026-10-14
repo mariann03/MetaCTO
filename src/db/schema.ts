@@ -1,7 +1,10 @@
+import { sql } from "drizzle-orm";
 import {
   bigint,
   boolean,
+  check,
   index,
+  integer,
   jsonb,
   pgEnum,
   pgTable,
@@ -11,6 +14,7 @@ import {
   vector,
 } from "drizzle-orm/pg-core";
 import type { RequestAnalysis } from "@/domain/intake";
+import { JUDGED } from "@/domain/ranking";
 
 /** Embedding vector size; every configured embedding model must produce it. */
 export const EMBEDDING_DIMENSIONS = 1024;
@@ -169,5 +173,49 @@ export const supports = pgTable(
     uniqueIndex("supports_problem_user_idx").on(t.problemId, t.userId),
     index("supports_user_id_idx").on(t.userId),
     index("supports_request_id_idx").on(t.requestId),
+  ],
+);
+
+/** What the AI judges per Problem; Reach and Business value are computed in SQL instead. */
+// Named as the ranking's criteria, so no mapping is needed.
+export const scoreCriterion = pgEnum("score_criterion", JUDGED);
+
+export const scores = pgTable(
+  "scores",
+  {
+    id: id(),
+    problemId: refColumn("problem_id")
+      .notNull()
+      .references(() => problems.id, { onDelete: "cascade" }),
+    criterion: scoreCriterion("criterion").notNull(),
+    // The AI's judgement, 1 to 5, with its one-line reason and the requests it cites.
+    value: integer("value").notNull(),
+    rationale: text("rationale").notNull(),
+    citedRequestIds: bigint("cited_request_ids", { mode: "number" })
+      .array()
+      .notNull(),
+    // Fingerprints of the evidence and strategy the AI saw; when either changes, the score is stale.
+    evidence: text("evidence").notNull(),
+    strategy: text("strategy").notNull(),
+    scoredAt: timestamp("scored_at", { withTimezone: true }).notNull(),
+    // A PM override replaces the value in the ranking; the AI's stays beside it.
+    overrideValue: integer("override_value"),
+    overrideReason: text("override_reason"),
+    overriddenBy: refColumn("overridden_by").references(() => users.id),
+    overriddenAt: timestamp("overridden_at", { withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex("scores_problem_criterion_idx").on(t.problemId, t.criterion),
+    index("scores_overridden_by_idx").on(t.overriddenBy),
+    check("scores_value_range", sql`${t.value} between 1 and 5`),
+    check(
+      "scores_override_range",
+      sql`${t.overrideValue} is null or ${t.overrideValue} between 1 and 5`,
+    ),
+    // An override always says why.
+    check(
+      "scores_override_reason",
+      sql`(${t.overrideValue} is null) = (${t.overrideReason} is null)`,
+    ),
   ],
 );

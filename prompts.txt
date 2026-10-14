@@ -367,3 +367,7 @@ Response: rank() now computes the maxima once and scores with an object literal 
 [2026-10-13T05:10:00Z]
 Prompt: okay I need to keep moving and this is taking too long, can we continue with other tasks that are no blocked by this one?
 Response: Left the #23 eval running and started #9 in a separate git worktree (branch feat/9-problem-detail): Explore semantic search and status filter, a Problem page with status, supporters, decision and update placeholders and requests anonymized to the customer's segment. Service tests and an Explore E2E pass.
+
+[2026-10-13T06:25:00Z]
+Prompt: /mattpocock-skills:implement #13
+Response: Branch feat/13-ai-scoring (in the worktree). Added AI scoring: a scores table (1-5 per criterion, rationale, cited requests, PM override with reason), one structured reasoning call per Problem against the strategy, staleness derived from evidence and strategy fingerprints, Rescore and Rescore all stale (in the background), overrides recorded as events and used in the ranking, the strategy editor in Settings, AI columns and weights on Priorities, and a PM Scores section on the Problem page. The seed now scores every Problem. Service and E2E tests pass.

@@ -38,3 +38,12 @@ export async function submit(
   await page.getByRole("button", { name: "Submit request" }).click();
   await expect(page.getByRole("status").first()).toBeVisible();
 }
+
+/** On the Priorities page: every weight at 0 except `criterion` (e.g. "Reach") at 10. */
+export async function weighOnly(page: Page, criterion: string) {
+  for (const slider of await page.getByRole("slider").all())
+    await slider.press("Home");
+  const only = page.getByRole("slider", { name: `${criterion} weight` });
+  await only.press("End");
+  await expect(only).toHaveValue("10");
+}

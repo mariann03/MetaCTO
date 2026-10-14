@@ -65,9 +65,9 @@ Rows are checked top to bottom. The creation lock re-checks only Problems create
 
 - **Computed in SQL, always fresh:** Reach (distinct supporters/accounts), Business value (ARR, segment mix, churn flags).
 - **Scoring:** each criterion scores 0–1 against the top Problem on it. Reach weighs supporters and accounts equally; Business value is ARR (each account once) with at-risk ARR counted twice; segment mix is shown, not scored. Shipped and declined Problems are left out. The Priorities page ranks in the browser as the PM moves the 0–10 weight sliders (weights are not saved).
-- **LLM-judged:** Strategic fit (vs the PM's strategy doc), Urgency/severity, Effort (labeled as a guess). Each score carries a rationale and citations to specific requests.
-- LLM scores are marked **stale** on new evidence or a strategy-doc change; PM rescores manually or via "Rescore all stale". No automatic bulk rescoring.
-- Final rank = PM-weighted sum computed in code. PM can override any score with a required reason; the override is logged and shown beside the AI score.
+- **LLM-judged:** Strategic fit (vs the PM's strategy doc), Urgency/severity, Effort (labeled as a guess), 1–5 each from one structured reasoning-tier call per Problem (thinking off). Each score carries a one-line rationale and citations to specific requests; citing a request the model was not shown fails the scoring. The prompt holds the strategy, the statement and the newest 30 requests and +1 notes. In the ranking, a score maps to 0–1 ((value − 1) / 4), Effort inverted (less effort ranks higher), and a never-scored criterion counts as the middle (0.5).
+- LLM scores are **stale** on new evidence (a submitted request joining or leaving the Problem, a +1 with a note) or a strategy-doc change. Staleness is derived, not flagged: each score stores fingerprints of the evidence and strategy it saw, compared on read, so intake, review and merges need no stale triggers. PM rescores one Problem, or "Rescore all stale" scores every stale or unscored one in the background (after the response). No automatic rescoring.
+- Final rank = PM-weighted sum computed in code. PM can override any score with a required reason; the override is logged, shown beside the AI score, used in the ranking and kept across rescores.
 
 ## Decisions and communication
 

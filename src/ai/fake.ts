@@ -47,6 +47,21 @@ const fakeGenerate: Generate = async ({ prompt }) => {
   if (text.includes("<current_statement>"))
     return jsonResult({ changed: false, statement: "" });
 
+  // Scoring: middling scores citing the first request it was shown.
+  if (text.includes("<strategy>")) {
+    const first = Number(/<request id=\\"(\d+)\\"/.exec(text)?.[1]);
+    const judgement = {
+      rationale: "Fake rationale",
+      score: 3,
+      citedRequestIds: [first],
+    };
+    return jsonResult({
+      strategicFit: judgement,
+      urgency: judgement,
+      effort: judgement,
+    });
+  }
+
   const title = /<title>([\s\S]*?)<\/title>/.exec(text)?.[1] ?? "";
   if (title.includes("[flaky]")) {
     const attempts = (flakyAttempts.get(title) ?? 0) + 1;

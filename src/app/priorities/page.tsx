@@ -1,5 +1,7 @@
 import { Suspense } from "react";
+import { RescoreStaleButton } from "@/components/scoring-controls";
 import { listCriteria } from "@/domain/prioritization";
+import { needsScoring } from "@/domain/scoring";
 import { deps } from "@/server/deps";
 import { getSession } from "@/server/session";
 import { Ranking } from "./ranking";
@@ -28,5 +30,11 @@ async function Priorities() {
   const criteria = await listCriteria(deps);
   if (criteria.length === 0)
     return <p className="text-muted-foreground">No problems yet.</p>;
-  return <Ranking criteria={criteria} />;
+  const due = criteria.filter((p) => needsScoring(p.judged)).length;
+  return (
+    <div className="space-y-6">
+      <RescoreStaleButton due={due} />
+      <Ranking criteria={criteria} />
+    </div>
+  );
 }

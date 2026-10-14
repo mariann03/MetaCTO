@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
+import { after } from "next/server";
 import { z } from "zod";
 import {
   requestSplit,
@@ -15,8 +16,10 @@ import {
   SUPPORT_SOURCES,
   type SupportSource,
 } from "@/domain/problems";
+import { JUDGED } from "@/domain/ranking";
 import { reviewRequest } from "@/domain/review";
-import { MATCH_MODES, setMatchMode } from "@/domain/settings";
+import { overrideScore, rescoreProblem, rescoreStale } from "@/domain/scoring";
+import { MATCH_MODES, setMatchMode, updateStrategy } from "@/domain/settings";
 import { deps } from "@/server/deps";
 import { getSession, USER_COOKIE } from "@/server/session";
 
@@ -202,4 +205,90 @@ async function currentUser() {
   const { current } = await getSession();
   if (!current) throw new Error("No user selected");
   return current;
+}
+
+export interface StrategyState {
+  status: "idle" | "saved" | "invalid" | "forbidden";
+}
+
+export async function updateStrategyAction(
+  _prev: StrategyState,
+  form: FormData,
+): Promise<StrategyState> {
+  const user = await currentUser();
+  if (user.role !== "pm") return { status: "forbidden" };
+  const strategy = z.string().max(20000).safeParse(form.get("strategy"));
+  if (!strategy.success) return { status: "invalid" };
+  await updateStrategy(deps, { userId: user.id, strategy: strategy.data });
+  revalidatePath("/settings");
+  revalidatePath("/priorities");
+  return { status: "saved" };
+}
+
+export interface RescoreState {
+  status: "idle" | "rescored" | "started" | "failed" | "forbidden";
+}
+
+export async function rescoreProblemAction(
+  problemId: number,
+): Promise<RescoreState> {
+  const user = await currentUser();
+  if (user.role !== "pm") return { status: "forbidden" };
+  const id = z.number().int().positive().parse(problemId);
+  try {
+    await rescoreProblem(deps, { userId: user.id, problemId: id });
+  } catch (error) {
+    console.error(`Rescoring Problem ${id} failed`, error);
+    return { status: "failed" };
+  }
+  revalidatePath(`/problems/${id}`);
+  revalidatePath("/priorities");
+  return { status: "rescored" };
+}
+
+/** Scores every stale or unscored Problem after responding: one model call each, minutes in all. */
+export async function rescoreStaleAction(): Promise<RescoreState> {
+  const user = await currentUser();
+  if (user.role !== "pm") return { status: "forbidden" };
+  // ponytail: no guard against a second click starting a second pass; record a running job if that wastes model time.
+  after(() => rescoreStale(deps, { userId: user.id }));
+  return { status: "started" };
+}
+
+const overrideInput = z.object({
+  value: z.coerce.number().int().min(1).max(5),
+  reason: z.string().trim().min(1).max(1000),
+});
+
+export interface OverrideState {
+  status:
+    | "idle"
+    | "invalid"
+    | "forbidden"
+    | Awaited<ReturnType<typeof overrideScore>>;
+}
+
+export async function overrideScoreAction(
+  problemId: number,
+  criterion: string,
+  _prev: OverrideState,
+  form: FormData,
+): Promise<OverrideState> {
+  const user = await currentUser();
+  if (user.role !== "pm") return { status: "forbidden" };
+  const input = overrideInput.safeParse({
+    value: form.get("value"),
+    reason: form.get("reason"),
+  });
+  if (!input.success) return { status: "invalid" };
+  const id = z.number().int().positive().parse(problemId);
+  const status = await overrideScore(deps, {
+    userId: user.id,
+    problemId: id,
+    criterion: z.enum(JUDGED).parse(criterion),
+    ...input.data,
+  });
+  revalidatePath(`/problems/${id}`);
+  revalidatePath("/priorities");
+  return { status };
 }
