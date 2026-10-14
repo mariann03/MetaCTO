@@ -80,6 +80,22 @@ describe("askClarifyingQuestions", () => {
     expect(language.doGenerateCalls[0]?.reasoning).toBe("none");
   });
 
+  test("asks each question once, even when the model repeats one", async () => {
+    await setMaxClarifyingQuestions({ db }, { userId: people.priya, max: 3 });
+    const { models } = scriptedModels({
+      generate: async () =>
+        jsonResult({
+          needMissing: true,
+          questions: ["Why?", " Why? ", "How?"],
+        }),
+    });
+
+    expect(await askClarifyingQuestions({ db, models }, SOLUTION)).toEqual([
+      "Why?",
+      "How?",
+    ]);
+  });
+
   test("asks nothing when the request already says why", async () => {
     expect(
       await askClarifyingQuestions(
@@ -139,8 +155,10 @@ describe("submitting with clarifications", () => {
         clarifications: [
           {
             question: QUESTIONS[1] ?? "",
-            answer: "We retype every invoice into Sheets.",
+            answer: " We retype every invoice into Sheets. ",
           },
+          // Left blank: skipped.
+          { question: QUESTIONS[2] ?? "", answer: "  " },
         ],
       },
     );

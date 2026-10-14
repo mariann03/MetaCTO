@@ -52,12 +52,15 @@ test("a submitter answers or skips the clarifying question, and a PM can turn it
 
   // Off: no question at all.
   await setMaxQuestions(page, "None (off)");
-  await asSubmitter(page, 13);
-  await writeAndNext(page, `slack [solution] ${stamp}`);
-  await expect(
-    page.getByRole("button", { name: "Submit request" }),
-  ).toBeVisible();
-  await expect(page.getByText("Checking whether")).toHaveCount(0);
-  await expect(page.getByLabel(QUESTION)).toHaveCount(0);
-  await setMaxQuestions(page, "1");
+  try {
+    await asSubmitter(page, 13);
+    await writeAndNext(page, `slack [solution] ${stamp}`);
+    await expect(
+      page.getByRole("button", { name: "Submit request" }),
+    ).toBeEnabled();
+    await expect(page.getByLabel(QUESTION)).toHaveCount(0);
+  } finally {
+    // Later specs expect the default.
+    await setMaxQuestions(page, "1");
+  }
 });

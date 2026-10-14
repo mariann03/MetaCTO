@@ -15,6 +15,7 @@ import {
   recordDecision,
 } from "@/domain/decisions";
 import {
+  type Clarification,
   requestSplit,
   resubmitDraft,
   type SubmitResult,
@@ -30,6 +31,7 @@ import { JUDGED } from "@/domain/ranking";
 import { reviewRequest } from "@/domain/review";
 import { overrideScore, rescoreProblem, rescoreStale } from "@/domain/scoring";
 import {
+  getMaxClarifyingQuestions,
   MATCH_MODES,
   MAX_CLARIFYING_QUESTIONS,
   setMatchMode,
@@ -63,12 +65,24 @@ const requestInput = z.object({
     .max(5000),
 });
 
-// React resets the form after every action, so text that was not saved is echoed back.
+// React resets the form after every action, so text that was not saved is echoed back,
+// clarifying answers included.
 export type SubmitState = (
   | { status: "idle" }
   | SubmitResult
   | { status: "invalid"; errors: { title?: string[]; description?: string[] } }
-) & { fields?: z.input<typeof requestInput> };
+) & {
+  fields?: z.input<typeof requestInput> & { clarifications?: Clarification[] };
+};
+
+/** The clarifying questions and answers as the form sent them, paired by position. */
+function echoed(form: FormData): Clarification[] {
+  const questions = form.getAll("question").map(String);
+  return form.getAll("answer").map((answer, i) => ({
+    question: questions[i] ?? "",
+    answer: String(answer),
+  }));
+}
 
 export async function submitRequestAction(
   _prev: SubmitState,
@@ -83,35 +97,37 @@ export async function submitRequestAction(
     return {
       status: "invalid",
       errors: z.flattenError(parsed.error).fieldErrors,
-      fields,
+      fields: { ...fields, clarifications: echoed(form) },
     };
 
-  // Answered clarifying questions only; an empty answer is a skipped question.
-  const questions = form.getAll("question").map(String);
-  const clarifications = z
+  const clarifications = echoed(form);
+  const asked = z
     .array(
       z.object({
         question: z.string().trim().min(1).max(500),
-        answer: z.string().trim().max(2000),
+        answer: z.string().max(2000),
       }),
     )
-    .max(MAX_CLARIFYING_QUESTIONS)
-    .parse(
-      form.getAll("answer").map((answer, i) => ({
-        question: questions[i],
-        answer: String(answer),
-      })),
-    )
-    .filter((c) => c.answer !== "");
+    .max(await getMaxClarifyingQuestions(deps))
+    .safeParse(clarifications);
+  // Only a tampered form gets here; the submitter keeps what they wrote.
+  if (!asked.success)
+    return {
+      status: "invalid",
+      errors: {},
+      fields: { ...fields, clarifications },
+    };
 
   const user = await currentUser();
   const result = await submitRequest(deps, {
     authorId: user.id,
     ...parsed.data,
-    clarifications,
+    clarifications: asked.data,
   });
   revalidatePath("/my-requests");
-  return result.status === "rate_limited" ? { ...result, fields } : result;
+  return result.status === "rate_limited"
+    ? { ...result, fields: { ...fields, clarifications } }
+    : result;
 }
 
 export async function resubmitDraftAction(

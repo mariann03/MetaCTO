@@ -199,12 +199,21 @@ export async function submitRequest(
   if (await isRateLimited(deps.db, input.authorId))
     return { status: "rate_limited" };
 
+  // A question left blank was skipped: only answers are kept.
+  const clarifications = (input.clarifications ?? [])
+    .map((c) => ({ question: c.question.trim(), answer: c.answer.trim() }))
+    .filter((c) => c.question !== "" && c.answer !== "");
   const [row] = await deps.db
     .insert(requests)
-    .values({ ...input, status: "analyzing", analysisStartedAt: sql`now()` })
+    .values({
+      ...input,
+      clarifications,
+      status: "analyzing",
+      analysisStartedAt: sql`now()`,
+    })
     .returning({ id: requests.id });
   if (!row) throw new Error("Request was not saved");
-  return runSubmission(deps, { id: row.id, ...input });
+  return runSubmission(deps, { id: row.id, ...input, clarifications });
 }
 
 /**
@@ -726,7 +735,7 @@ async function analyze(
 
 /** The text a request is embedded from; the eval embeds fixtures the same way. */
 export function embeddingText(
-  request: Pick<RequestText, "title" | "description" | "clarifications">,
+  request: Pick<RequestText, "title" | "description">,
 ) {
   // The E2E fake embedding reads the title back as the text before the blank line.
   return `${request.title}\n\n${request.description}`;

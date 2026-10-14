@@ -17,12 +17,19 @@ import {
 
 const idle: ClarifyingSettingState = { status: "idle" };
 
-export function ClarifyingForm({ max, limit }: { max: number; limit: number }) {
+/** `value` is the current setting; `ceiling` the most a PM may choose. */
+export function ClarifyingForm({
+  value,
+  ceiling,
+}: {
+  value: number;
+  ceiling: number;
+}) {
   const [state, action, pending] = useActionState(
     setMaxClarifyingQuestionsAction,
     idle,
   );
-  const options = Array.from({ length: limit + 1 }, (_, n) => ({
+  const options = Array.from({ length: ceiling + 1 }, (_, n) => ({
     value: String(n),
     label: n === 0 ? "None (off)" : String(n),
   }));
@@ -30,7 +37,7 @@ export function ClarifyingForm({ max, limit }: { max: number; limit: number }) {
     <form action={action} className="flex flex-wrap items-end gap-3">
       <div className="space-y-2">
         <Label id="clarifying-label">Clarifying questions per request</Label>
-        <Select name="max" items={options} defaultValue={String(max)}>
+        <Select name="max" items={options} defaultValue={String(value)}>
           <SelectTrigger aria-labelledby="clarifying-label" className="w-40">
             <SelectValue />
           </SelectTrigger>

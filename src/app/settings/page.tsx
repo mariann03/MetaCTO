@@ -59,7 +59,7 @@ async function MatchingSettings() {
   return (
     <div className="space-y-8">
       <StrategyForm strategy={strategy} />
-      <ClarifyingForm max={maxQuestions} limit={MAX_CLARIFYING_QUESTIONS} />
+      <ClarifyingForm value={maxQuestions} ceiling={MAX_CLARIFYING_QUESTIONS} />
       <MatchModeForm mode={mode} />
       <Table className="-mt-4">
         <TableCaption>
