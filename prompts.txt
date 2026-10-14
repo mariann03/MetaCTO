@@ -415,3 +415,7 @@ Response: Branch feat/7-clarifying-questions. On Next, a fast-tier call (thinkin
 [2026-10-14T07:10:00Z]
 Prompt: can we do something else in the meanwhile?
 Response: Committed the #17 work in progress and drafted the README on feat/18-readme (local setup, architecture, AI design decisions, human-in-the-loop points, metrics, assumptions, risks and trade-offs), which needs no models while the seed runs. Deploy and #19 wait on decisions.
+
+[2026-10-14T06:30:00Z]
+Prompt: vercel + neon is for the "production build" the tunnel is just for the demo. we are not using vercel + neon right now but the app should be able to use that setup later
+Response: Checked the app is ready for Vercel + Neon (pooled/direct URLs, attachDatabasePool, pgvector via migration; hosted models and per-model thresholds are configuration). Added a Deploying section to the README (production path steps, and the demo via the local build behind the Cloudflare Tunnel) and updated the design doc's infra line.

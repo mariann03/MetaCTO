@@ -127,7 +127,7 @@ Verified versions and usage notes live in `docs/stack/*.md`; project-level agent
 - **Data:** Postgres 18 + pgvector, Drizzle ORM (stable 0.45 / drizzle-kit 0.31) over `pg` (node-postgres) with `attachDatabasePool`. HNSW index with cosine ops; order by `cosineDistance` ascending; `SET LOCAL hnsw.iterative_scan = relaxed_order` for filtered top-k.
 - **UI:** Tailwind v4 + shadcn/ui on Base UI (`base-nova`).
 - **Tooling:** Biome, `bun test`, Zod 4, date-fns 4, `ms` 2.
-- **Infra:** Docker Compose locally (Postgres; Langfuse stack optional). Deploy: Vercel + Neon (migrations over the direct URL, app over the pooled URL).
+- **Infra:** Docker Compose locally (Postgres; Langfuse stack optional). Production target: Vercel + Neon (migrations over the direct URL, app over the pooled URL, hosted models), supported but not deployed yet. The demo runs locally (production build, local models and Postgres) behind a Cloudflare Tunnel at metacto.mariann.dev.
 
 Domain and AI logic live in plain TypeScript modules, not Next-specific ones, so they're testable with `bun test`.
 

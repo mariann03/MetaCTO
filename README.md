@@ -6,7 +6,7 @@ Feature requests arrive as unstructured, solution-shaped and duplicated text, an
 
 The guiding principle is **AI drafts and scores, the PM decides**. Every AI output shows its evidence, and a PM can override it.
 
-- **Live demo:** _added with the deploy (#18)._
+- **Live demo:** https://metacto.mariann.dev. It runs on the author's machine (local models, local Postgres) behind a Cloudflare Tunnel, so it can be offline, and anyone with the link can act as a PM. See [Deploying](#deploying).
 - **Design source of truth:** [`docs/design.md`](docs/design.md). The intake model comparison is in [`docs/eval-intake-setups.md`](docs/eval-intake-setups.md).
 
 ## What it does
@@ -68,6 +68,19 @@ bun run eval           # matching accuracy on the labeled fixtures (replays from
 ```
 
 **Tracing (optional).** `docker compose -f docker-compose.langfuse.yml up -d` starts a local Langfuse on http://localhost:3001 (login `dev@example.com` / `local-password`). Uncomment the three `LANGFUSE_*` lines in `.env` and restart the app: every AI call then appears as a trace with its prompt, output, tokens and latency, including the brief agent's tool calls. Without them, tracing is not loaded at all.
+
+## Deploying
+
+**Production target: Vercel + Neon.** The app is built for it and needs no code changes, only configuration:
+
+1. Create a Neon project. The first migration enables `pgvector`, which Neon supports.
+2. Set two URLs: `DATABASE_URL` is Neon's pooled (`-pooler`) URL, which the app uses; `DATABASE_URL_UNPOOLED` is the direct URL, which migrations use. The `pg` pool is attached with `@vercel/functions` so idle clients close before a function suspends.
+3. Choose hosted models, since Vercel cannot reach a local Ollama: e.g. `INTAKE_MODEL=anthropic:claude-haiku-5-5`, `REASONING_MODEL=anthropic:claude-sonnet-5-5`, `EMBEDDING_MODEL=voyage:voyage-4`, with `ANTHROPIC_API_KEY` and `VOYAGE_API_KEY`. Set the same variables in the Vercel project, plus the optional `LANGFUSE_*` ones.
+4. From a machine with those variables: `bun run db:migrate`, then `bun run seed` (its answers are not cached for new models, so it calls them once).
+5. Matching thresholds are stored per embedding model, so run `bun run eval` with the new models and commit `data/eval/` before deploying; until then intake uses the provisional thresholds.
+6. Deploy with `vercel` (or by connecting the repo). Long AI work the PM asks for (rescoring everything, a decision brief) runs after the response with `after()`, which Vercel's Fluid compute keeps alive up to the function's maximum duration; hosted models finish well within it.
+
+**The demo today** runs locally instead, so it uses the same local models the evaluation measured: `bun run build && bun run start` serves the app on :3000, and a Cloudflare Tunnel (`cloudflared tunnel --config ~/.cloudflared/metacto.yml run metacto`) publishes it at https://metacto.mariann.dev.
 
 ## Architecture
 
