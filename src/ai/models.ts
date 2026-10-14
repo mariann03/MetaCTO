@@ -27,7 +27,7 @@ export interface Models {
  * carries one can only answer in that shape, so it can never call a tool.
  */
 export function schemaBlocksTools(model: LanguageModel) {
-  return typeof model !== "string" && model.provider === "ollama";
+  return typeof model !== "string" && model.provider.startsWith("ollama");
 }
 
 /** `provider:model` name of an embedding model, as stored with each vector. */

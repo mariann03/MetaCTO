@@ -263,7 +263,7 @@ function briefTools(
  * tools (at most STEP_CAP model steps) and writes a brief whose every claim cites what it
  * read. A brief citing anything the tools did not return is rejected, as is a run that
  * never answers; both are logged and the PM can ask again. Where a response schema blocks
- * tool calls (Ollama), the tools run without it and one last call writes the brief.
+ * tool calls (Ollama), the tools run without it and one more call writes the brief.
  */
 export async function generateBrief(
   { db, models }: Deps,
@@ -282,23 +282,27 @@ export async function generateBrief(
       maxRetries: 0,
       telemetry: { functionId: "decision-brief" },
     };
-    const agent = {
+    const agentSettings = {
       ...settings,
       tools: briefTools({ db }, problemId, seen),
       stopWhen: isStepCount(STEP_CAP),
     };
-    const schema = Output.object({ schema: briefSchema });
+    const briefOutput = Output.object({ schema: briefSchema });
     let output: Brief;
     if (schemaBlocksTools(models.reasoning)) {
-      const gathered = await new ToolLoopAgent(agent).generate({ prompt });
-      if (gathered.finishReason === "tool-calls")
-        throw new Error(`No answer within ${STEP_CAP} steps`);
+      const gathered = await new ToolLoopAgent(agentSettings).generate({
+        prompt,
+      });
+      // Cut off at the step cap (or by length or an error): it never answered.
+      if (gathered.finishReason !== "stop")
+        throw new Error(`Gathering ended with ${gathered.finishReason}`);
       ({ output } = await generateText({
         ...settings,
         // Thinking while bound to a schema, qwen answers with empty fields; it already
         // thought while gathering.
         reasoning: "none",
-        output: schema,
+        output: briefOutput,
+        telemetry: { functionId: "decision-brief-write" },
         messages: [
           { role: "user", content: prompt },
           ...gathered.responseMessages,
@@ -307,8 +311,8 @@ export async function generateBrief(
       }));
     } else {
       ({ output } = await new ToolLoopAgent({
-        ...agent,
-        output: schema,
+        ...agentSettings,
+        output: briefOutput,
       }).generate({
         prompt,
       }));
