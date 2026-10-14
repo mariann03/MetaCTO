@@ -35,15 +35,21 @@ try {
     .select({ id: problems.id })
     .from(problems)
     .where(notInArray(problems.status, DECIDED));
+  // A Problem whose scoring is rejected (e.g. it cites a request it was not shown) stays
+  // unscored, as with "Rescore all stale"; the PM can rescore it.
+  const unscored: number[] = [];
   for (const [i, { id }] of all.entries()) {
-    await scoreProblem({ db, models }, id);
+    await scoreProblem({ db, models }, id).catch((error: unknown) => {
+      console.error(`Problem ${id} left unscored:`, String(error));
+      unscored.push(id);
+    });
     if ((i + 1) % 10 === 0 || i + 1 === all.length) {
       save();
       console.log(`Scored ${i + 1}/${all.length} problems`);
     }
   }
   save({ complete: true });
-  console.log("Seed complete:", summary);
+  console.log("Seed complete:", { ...summary, unscored });
 } finally {
   save();
   await db.$client.end();
