@@ -20,10 +20,23 @@ describe("the vscode eval dataset", () => {
     }
   });
 
-  test("names no author: one anonymous author, no @handles", async () => {
+  test("names nobody: one anonymous author, no handles, profile links, home paths or emails", async () => {
     for (const r of await loadRequestFixtures("vscode")) {
+      const text = `${r.title} ${r.description}`;
       expect(r.authorKey).toBe("oss");
-      expect(`${r.title} ${r.description}`).not.toMatch(/@(?!someone\b)[\w-]+/);
+      // A mention: @ at a word start, not an email or a package like @types/node.
+      expect(text).not.toMatch(
+        // Ending a sentence counts; an email or a package like @types/node does not.
+        /(^|[\s(])@(?!someone\b)[A-Za-z\d-]+(?![\w/-]|\.\w)/,
+      );
+      // github.com/<user> is a person; only microsoft's own links may stay.
+      expect(text).not.toMatch(/github\.com\/(?!microsoft\b|someone\b)[\w-]+/i);
+      // A one-word name under a sign-off, wherever it sits.
+      expect(text).not.toMatch(
+        /\n\s*(Best|Thanks|Regards|Cheers)[^\n]{0,30}\r?\n\s*[A-Za-z][\w-]{1,20}\s*(\r?\n|$)/i,
+      );
+      expect(text).not.toMatch(/(\/Users|\/home|\\Users)[\\/](?!someone\b)\w/);
+      expect(text).not.toMatch(/[\w.+-]+@[\w-]+\.[\w.]+/);
     }
   });
 });

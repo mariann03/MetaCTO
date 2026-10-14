@@ -1,12 +1,15 @@
 // Builds an eval-only dataset of real feature requests from microsoft/vscode, whose
-// maintainers mark duplicates machine-readably ("/duplicate of #N"). A labeled duplicate
-// and its original share a problemKey; every other request is its own. Unlabeled duplicates
-// surely exist, so precision measured on it is a lower bound. Authors are dropped and
-// @mentions removed. Never loaded into the demo database.
-//   GITHUB_TOKEN=$(gh auth token) bun scripts/oss-dataset.ts
+// maintainers mark duplicates with a command ("/duplicate of #N"). A labeled duplicate and
+// its original share a problemKey; every other request is its own. Unlabeled duplicates
+// surely exist, so precision measured on it is a lower bound. Nobody is named: authors are
+// dropped, and handles, profile links, emails, home paths and sign-offs are scrubbed; issue
+// references are removed too, so no request points at its answer. Never loaded into the
+// demo database.
+//   GITHUB_TOKEN=$(gh auth token) bun run dataset:vscode
 import { createHash } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import ms from "ms";
 import { z } from "zod";
 
 const REPO = "microsoft/vscode";
@@ -24,6 +27,7 @@ const issueSchema = z.object({
 });
 type Issue = z.infer<typeof issueSchema>;
 
+/** A GitHub API response; null for a missing issue (deleted or transferred). */
 async function github(path: string): Promise<unknown> {
   for (let attempt = 0; ; attempt++) {
     const res = await fetch(`https://api.github.com/${path}`, {
@@ -33,9 +37,13 @@ async function github(path: string): Promise<unknown> {
       },
     });
     if (res.ok) return res.json();
-    // The search API allows 30 requests a minute; wait it out.
-    if ((res.status === 403 || res.status === 429) && attempt < 5) {
-      await Bun.sleep(30_000);
+    if (res.status === 404 || res.status === 410) return null;
+    // Rate limited (the search API allows 30 requests a minute): wait as told, then retry.
+    const retryAfter = Number(res.headers.get("retry-after"));
+    const limited =
+      res.status === 429 || res.headers.get("x-ratelimit-remaining") === "0";
+    if (limited && attempt < 5) {
+      await Bun.sleep(retryAfter > 0 ? retryAfter * 1000 : ms("60s"));
       continue;
     }
     throw new Error(`${path}: ${res.status} ${await res.text()}`);
@@ -58,34 +66,65 @@ async function search(query: string, limit: number) {
   return found.slice(0, limit);
 }
 
-/** The original a maintainer pointed a duplicate at, from its comments. */
+/**
+ * The original a maintainer pointed a duplicate at with the /duplicate command; the last
+ * one wins, as it is what closed the issue. Casual "duplicate of #N" remarks do not count.
+ */
 async function originalOf(issue: number) {
+  // ponytail: the first 100 comments only; page further if a command hides past them.
   const comments = z
     .array(z.object({ body: z.string().nullable() }))
-    .parse(await github(`repos/${REPO}/issues/${issue}/comments?per_page=100`));
-  for (const { body } of comments) {
-    const match =
-      /\/duplicate\s+(?:of\s+)?(?:#|https:\/\/github\.com\/microsoft\/vscode\/issues\/)(\d+)/i.exec(
-        body ?? "",
-      ) ?? /Duplicate of #(\d+)/i.exec(body ?? "");
-    if (match) return Number(match[1]);
-  }
-  return null;
+    .parse(
+      (await github(`repos/${REPO}/issues/${issue}/comments?per_page=100`)) ??
+        [],
+    );
+  let original: number | null = null;
+  for (const { body } of comments)
+    for (const match of (body ?? "").matchAll(
+      /^\s*\/duplicate\s+(?:of\s+)?(?:#|https:\/\/github\.com\/microsoft\/vscode\/issues\/)(\d+)/gim,
+    ))
+      original = Number(match[1]);
+  return original;
 }
 
 /** Plain text a customer could have written: no markup noise, no names, bounded. */
 function clean(text: string) {
-  return text
-    .replace(/<!--[\s\S]*?-->/g, "")
-    .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
-    .replace(/<img[^>]*>/gi, "")
-    .replace(/@[\w-]+/g, "@someone")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim()
-    .slice(0, BODY_LIMIT);
+  return (
+    text
+      // Cut first, so scrubbing also covers whatever the cut leaves half-written.
+      .slice(0, BODY_LIMIT)
+      .replace(/<!--[\s\S]*?-->/g, "")
+      .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
+      .replace(/<img[^>]*>/gi, "")
+      // Attachments and issue references: links that name people or point at the answer.
+      .replace(/https?:\/\/github\.com\/user-attachments\/\S+/gi, "")
+      .replace(/Originally posted by [^\n]*/gi, "")
+      .replace(
+        /https?:\/\/github\.com\/microsoft\/vscode\/(issues|pull)\/\d+\S*/gi,
+        "an earlier issue",
+      )
+      .replace(/(^|[^\w&])#\d+\b/g, "$1an earlier issue")
+      // People: emails, profile and fork links, @handles (in text or URLs), home folders.
+      .replace(/[\w.+-]+@[\w-]+(\.[\w-]+)+/g, "someone@example.com")
+      .replace(/github\.com\/(?!microsoft\b)[\w-]+/gi, "github.com/someone")
+      .replace(/\/@[\w.-]+/g, "/@someone")
+      .replace(/(^|[\s(])@[A-Za-z\d-]+(?![\w/-]|\.\w)/g, "$1@someone")
+      .replace(/(\/Users|\/home|\\Users)([\\/])[\w.-]+/g, "$1$2someone")
+      // The one-word name under a sign-off, wherever it sits.
+      .replace(
+        /(\n\s*(?:Best|Thanks|Regards|Cheers|Kind regards)[^\n]{0,30}\r?\n)\s*[A-Za-z][\w-]{1,20}\s*(?=\r?\n|$)/gi,
+        "$1",
+      )
+      .replace(/\n{3,}/g, "\n\n")
+      .trim()
+  );
 }
 
-const request = (issue: Issue, problemKey: string, split: string) => ({
+const request = (
+  issue: Issue,
+  problemKey: string,
+  split: "train" | "holdout",
+) => ({
   key: `vsc-${issue.number}`,
   problemKey,
   authorKey: "oss",
@@ -96,7 +135,7 @@ const request = (issue: Issue, problemKey: string, split: string) => ({
 });
 
 // Whole groups go to one split, so a duplicate is never judged against a train-only original.
-const splitOf = (key: string) =>
+const splitOf = (key: string): "train" | "holdout" =>
   (createHash("sha256").update(key).digest()[0] ?? 0) % 3 === 0
     ? "holdout"
     : "train";
@@ -111,15 +150,15 @@ for (const [i, dup] of duplicates.entries()) {
   const original = await originalOf(dup.number);
   if (original === null || original === dup.number) continue;
   if (!issues.has(original)) {
-    const parsed = issueSchema.safeParse(
-      await github(`repos/${REPO}/issues/${original}`).catch(() => null),
-    );
-    if (!parsed.success || parsed.data.pull_request) continue;
-    issues.set(original, parsed.data);
-    groupOf.set(original, original);
+    const fetched = await github(`repos/${REPO}/issues/${original}`);
+    // A missing original (deleted or transferred) leaves nothing to group with.
+    if (fetched === null) continue;
+    const parsed = issueSchema.parse(fetched);
+    if (parsed.pull_request) continue;
+    issues.set(original, parsed);
   }
   issues.set(dup.number, dup);
-  groupOf.set(dup.number, groupOf.get(original) ?? original);
+  groupOf.set(dup.number, original);
   if ((i + 1) % 20 === 0)
     console.log(`Read ${i + 1}/${duplicates.length} duplicates`);
 }
@@ -129,15 +168,23 @@ const singles = await search(
   SINGLES,
 );
 for (const single of singles)
-  if (!issues.has(single.number)) {
-    issues.set(single.number, single);
-    groupOf.set(single.number, single.number);
+  if (!issues.has(single.number)) issues.set(single.number, single);
+
+/** Follows duplicate-of links to the first original, so a chain stays one Problem. */
+function rootOf(issue: number) {
+  const seen = new Set<number>();
+  let at = issue;
+  while (groupOf.has(at) && !seen.has(at)) {
+    seen.add(at);
+    at = groupOf.get(at) ?? at;
   }
+  return at;
+}
 
 const dataset = [...issues.values()]
   .sort((a, b) => a.created_at.localeCompare(b.created_at))
   .map((issue) => {
-    const problemKey = `vsc-${groupOf.get(issue.number) ?? issue.number}`;
+    const problemKey = `vsc-${rootOf(issue.number)}`;
     return request(issue, problemKey, splitOf(problemKey));
   });
 const dir = join(process.cwd(), "data", "eval", "oss");

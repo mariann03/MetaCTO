@@ -63,12 +63,14 @@ const setup: IntakeSetup = z
   })
   .parse({ ...INTAKE_SETUP, ...flags });
 const dataset = z.enum(DATASETS).default("fixtures").parse(flags.dataset);
+// Real-world data: its duplicate labels are incomplete, and it never tunes intake.
+const realWorld = dataset !== "fixtures";
 const setupName = `prompt=${INTAKE_PROMPT_ID} candidates=${setup.candidates} reasoning=${setup.reasoning}`;
 // The fixtures keep their unprefixed names, so earlier runs and cached answers still match.
-const datasetPrefix = dataset === "fixtures" ? "" : `${dataset} `;
+const datasetPrefix = realWorld ? `${dataset} ` : "";
 const runName = `${datasetPrefix}${setupName}`;
 const isIntakeSetup =
-  dataset === "fixtures" &&
+  !realWorld &&
   env.INTAKE_MODEL === appEnv.INTAKE_MODEL &&
   setup.candidates === INTAKE_SETUP.candidates &&
   setup.reasoning === INTAKE_SETUP.reasoning;
@@ -132,7 +134,7 @@ const latency = { medianMs: percentile(0.5), p90Ms: percentile(0.9) };
 console.log(
   `\nEmbedding ${embeddingModel}, intake ${env.INTAKE_MODEL}, ${setupName}; ${observations.length}/${fixtures.length} requests analyzed`,
 );
-if (dataset !== "fixtures")
+if (realWorld)
   console.log(
     `Dataset ${dataset}: duplicate labels are incomplete, so every precision below is a lower bound.`,
   );
@@ -156,6 +158,8 @@ const results = `${JSON.stringify(
     embeddingModel,
     intakeModel: env.INTAKE_MODEL,
     dataset,
+    // Unlabeled duplicates count as wrong groupings, so true precision can only be higher.
+    precisionIsLowerBound: realWorld,
     prompt: INTAKE_PROMPT_ID,
     setup,
     requests: fixtures.length,
