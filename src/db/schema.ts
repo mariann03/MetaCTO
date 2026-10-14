@@ -219,3 +219,70 @@ export const scores = pgTable(
     ),
   ],
 );
+
+/** A PM's decision on a Problem: its new status and the rationale customers see. */
+export const decisions = pgTable(
+  "decisions",
+  {
+    id: id(),
+    problemId: refColumn("problem_id")
+      .notNull()
+      .references(() => problems.id, { onDelete: "cascade" }),
+    status: problemStatus("status").notNull(),
+    rationale: text("rationale").notNull(),
+    decidedBy: refColumn("decided_by")
+      .notNull()
+      .references(() => users.id),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("decisions_problem_id_idx").on(t.problemId),
+    index("decisions_decided_by_idx").on(t.decidedBy),
+    check("decisions_decided_status", sql`${t.status} <> 'open'`),
+  ],
+);
+
+/** customer: for supporters, built from public facts only. internal: for Sales and CS. */
+export const updateAudience = pgEnum("update_audience", [
+  "customer",
+  "internal",
+]);
+
+/** An AI-drafted update on a decision; nothing goes out until a PM approves it. */
+export const updates = pgTable(
+  "updates",
+  {
+    id: id(),
+    decisionId: refColumn("decision_id")
+      .notNull()
+      .references(() => decisions.id, { onDelete: "cascade" }),
+    audience: updateAudience("audience").notNull(),
+    body: text("body").notNull(),
+    approvedBy: refColumn("approved_by").references(() => users.id),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("updates_decision_id_idx").on(t.decisionId),
+    index("updates_approved_by_idx").on(t.approvedBy),
+  ],
+);
+
+/** An approved customer update, delivered in-app to one supporter. */
+export const notifications = pgTable(
+  "notifications",
+  {
+    id: id(),
+    userId: refColumn("user_id")
+      .notNull()
+      .references(() => users.id),
+    updateId: refColumn("update_id")
+      .notNull()
+      .references(() => updates.id, { onDelete: "cascade" }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("notifications_user_update_idx").on(t.userId, t.updateId),
+    index("notifications_update_id_idx").on(t.updateId),
+  ],
+);

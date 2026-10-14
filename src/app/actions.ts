@@ -5,6 +5,12 @@ import { cookies } from "next/headers";
 import { after } from "next/server";
 import { z } from "zod";
 import {
+  approveUpdate,
+  DECISIONS,
+  draftUpdates,
+  recordDecision,
+} from "@/domain/decisions";
+import {
   requestSplit,
   resubmitDraft,
   type SubmitResult,
@@ -290,5 +296,85 @@ export async function overrideScoreAction(
   });
   revalidatePath(`/problems/${id}`);
   revalidatePath("/priorities");
+  return { status };
+}
+
+export interface DecisionState {
+  status: "idle" | "recorded" | "draft_failed" | "invalid" | "forbidden";
+}
+
+export async function recordDecisionAction(
+  problemId: number,
+  _prev: DecisionState,
+  form: FormData,
+): Promise<DecisionState> {
+  const user = await currentUser();
+  if (user.role !== "pm") return { status: "forbidden" };
+  const input = z
+    .object({
+      status: z.enum(DECISIONS),
+      rationale: z.string().trim().min(1).max(2000),
+    })
+    .safeParse({
+      status: form.get("status"),
+      rationale: form.get("rationale"),
+    });
+  if (!input.success) return { status: "invalid" };
+  const id = z.number().int().positive().parse(problemId);
+  const { drafted } = await recordDecision(deps, {
+    userId: user.id,
+    problemId: id,
+    ...input.data,
+  });
+  revalidatePath(`/problems/${id}`);
+  revalidatePath("/priorities");
+  return { status: drafted ? "recorded" : "draft_failed" };
+}
+
+export interface DraftState {
+  status: "idle" | "drafted" | "failed" | "forbidden";
+}
+
+export async function draftUpdatesAction(
+  problemId: number,
+): Promise<DraftState> {
+  const user = await currentUser();
+  if (user.role !== "pm") return { status: "forbidden" };
+  const id = z.number().int().positive().parse(problemId);
+  try {
+    await draftUpdates(deps, { userId: user.id, problemId: id });
+  } catch (error) {
+    console.error(`Drafting updates for Problem ${id} failed`, error);
+    return { status: "failed" };
+  }
+  revalidatePath(`/problems/${id}`);
+  return { status: "drafted" };
+}
+
+export interface ApproveState {
+  status:
+    | "idle"
+    | "invalid"
+    | "forbidden"
+    | Awaited<ReturnType<typeof approveUpdate>>;
+}
+
+export async function approveUpdateAction(
+  updateId: number,
+  problemId: number,
+  _prev: ApproveState,
+  form: FormData,
+): Promise<ApproveState> {
+  const user = await currentUser();
+  if (user.role !== "pm") return { status: "forbidden" };
+  const body = z.string().trim().min(1).max(5000).safeParse(form.get("body"));
+  if (!body.success) return { status: "invalid" };
+  const status = await approveUpdate(deps, {
+    userId: user.id,
+    updateId: z.number().int().positive().parse(updateId),
+    body: body.data,
+  });
+  revalidatePath(`/problems/${z.number().int().positive().parse(problemId)}`);
+  revalidatePath("/notifications");
   return { status };
 }

@@ -7,17 +7,20 @@ import {
   desc,
   eq,
   inArray,
+  isNotNull,
   type SQL,
   sql,
 } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import {
   accounts,
+  decisions,
   events,
   problemStatus,
   problems,
   requests,
   supports,
+  updates,
   users,
 } from "@/db/schema";
 import type { DbDeps, Deps } from "./deps";
@@ -61,7 +64,8 @@ export async function listProblems(
 export type ProblemSummary = Awaited<ReturnType<typeof listProblems>>[number];
 
 /**
- * A Problem as anyone may see it, with the requests behind it, oldest first. Requests are
+ * A Problem as anyone may see it: its latest decision, its approved customer updates and the
+ * requests behind it, oldest first. Requests are
  * anonymized: only the author's customer segment is shown, never who or which account.
  */
 export async function getProblem(
@@ -89,7 +93,35 @@ export async function getProblem(
       and(eq(requests.problemId, problemId), eq(requests.status, "submitted")),
     )
     .orderBy(asc(requests.createdAt), asc(requests.id));
-  return { ...problem, requests: behind };
+  const [decision] = await db
+    .select({ status: decisions.status, rationale: decisions.rationale })
+    .from(decisions)
+    .where(eq(decisions.problemId, problemId))
+    .orderBy(desc(decisions.createdAt), desc(decisions.id))
+    .limit(1);
+  // The public feed: approved customer updates, newest first.
+  const feed = await db
+    .select({
+      id: updates.id,
+      body: updates.body,
+      approvedAt: updates.approvedAt,
+    })
+    .from(updates)
+    .innerJoin(decisions, eq(decisions.id, updates.decisionId))
+    .where(
+      and(
+        eq(decisions.problemId, problemId),
+        eq(updates.audience, "customer"),
+        isNotNull(updates.approvedAt),
+      ),
+    )
+    .orderBy(desc(updates.approvedAt), desc(updates.id));
+  return {
+    ...problem,
+    decision: decision ?? null,
+    requests: behind,
+    updates: feed,
+  };
 }
 
 /** Summaries of ranked Problems, in their rank order, each with its similarity. */

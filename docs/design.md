@@ -73,7 +73,7 @@ Rows are checked top to bottom. The creation lock re-checks only Problems create
 
 - **Decision brief** — generated on demand per Problem by a tool-using agent: problem statement, who's asking (segments, ARR), representative quotes, score breakdown, 2–3 solution options, open questions/risks.
 - **Decision** — PM records `Planned | Under review | Declined | Shipped` + rationale.
-- **Stakeholder updates** — on status change, two drafts: customer-facing (built from statement, decision and public rationale only) and internal (full context, sales/CS talking points). PM edits and approves; approved updates go to an in-app notification feed for every supporter.
+- **Stakeholder updates** — on status change, two drafts: customer-facing (built from statement, decision and public rationale only) and internal (full context, sales/CS talking points). PM edits and approves; approved updates go to an in-app notification feed for every supporter. Both drafts are reasoning-tier structured calls (thinking off) run in parallel after the decision commits; the internal one also gets the backing accounts (name, segment, ARR, churn risk), the newest +1 notes and the strategy. If drafting fails the decision stands and the PM drafts again; a new decision replaces drafts nobody approved. Approving a customer update notifies every supporter and adds it to the Problem's public update feed; an approved internal update stays on the Problem for the PM to pass on. Notifications have no read state yet.
 
 ## AI architecture
 
