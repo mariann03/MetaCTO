@@ -22,6 +22,14 @@ export interface Models {
   embedding: EmbeddingModel;
 }
 
+/**
+ * Whether the provider enforces a response schema while decoding (Ollama): a call that
+ * carries one can only answer in that shape, so it can never call a tool.
+ */
+export function schemaBlocksTools(model: LanguageModel) {
+  return typeof model !== "string" && model.provider === "ollama";
+}
+
 /** `provider:model` name of an embedding model, as stored with each vector. */
 export function embeddingModelName(model: EmbeddingModel) {
   return typeof model === "string"
