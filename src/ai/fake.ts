@@ -47,6 +47,28 @@ const fakeGenerate: Generate = async ({ prompt }) => {
   if (text.includes("<current_statement>"))
     return jsonResult({ changed: false, statement: "" });
 
+  // Update drafts: the internal one is the only call shown the accounts.
+  if (text.includes("<decision>"))
+    return jsonResult({
+      body: text.includes("<accounts>")
+        ? "Fake internal update with talking points."
+        : "Fake update: we have decided on this problem.",
+    });
+  // Scoring: middling scores citing the first request it was shown.
+  if (text.includes("<strategy>")) {
+    const first = Number(/<request id=\\"(\d+)\\"/.exec(text)?.[1]);
+    const judgement = {
+      rationale: "Fake rationale",
+      score: 3,
+      citedRequestIds: [first],
+    };
+    return jsonResult({
+      strategicFit: judgement,
+      urgency: judgement,
+      effort: judgement,
+    });
+  }
+
   const title = /<title>([\s\S]*?)<\/title>/.exec(text)?.[1] ?? "";
   if (title.includes("[flaky]")) {
     const attempts = (flakyAttempts.get(title) ?? 0) + 1;
@@ -89,8 +111,10 @@ export function createFakeModels(): Models {
     embedding: new MockEmbeddingModelV4({
       provider: "fake",
       modelId: "fake-embedding",
+      // Only the title counts (the text before the blank line), as in the fake analysis,
+      // so searching Explore for a request's title finds it.
       doEmbed: async ({ values }) => ({
-        embeddings: values.map(fakeEmbedding),
+        embeddings: values.map((v) => fakeEmbedding(v.split("\n\n")[0] ?? v)),
         warnings: [],
       }),
     }),

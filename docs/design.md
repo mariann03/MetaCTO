@@ -65,15 +65,15 @@ Rows are checked top to bottom. The creation lock re-checks only Problems create
 
 - **Computed in SQL, always fresh:** Reach (distinct supporters/accounts), Business value (ARR, segment mix, churn flags).
 - **Scoring:** each criterion scores 0–1 against the top Problem on it. Reach weighs supporters and accounts equally; Business value is ARR (each account once) with at-risk ARR counted twice; segment mix is shown, not scored. Shipped and declined Problems are left out. The Priorities page ranks in the browser as the PM moves the 0–10 weight sliders (weights are not saved).
-- **LLM-judged:** Strategic fit (vs the PM's strategy doc), Urgency/severity, Effort (labeled as a guess). Each score carries a rationale and citations to specific requests.
-- LLM scores are marked **stale** on new evidence or a strategy-doc change; PM rescores manually or via "Rescore all stale". No automatic bulk rescoring.
-- Final rank = PM-weighted sum computed in code. PM can override any score with a required reason; the override is logged and shown beside the AI score.
+- **LLM-judged:** Strategic fit (vs the PM's strategy doc), Urgency/severity, Effort (labeled as a guess), 1–5 each from one structured reasoning-tier call per Problem (thinking off). Each score carries a one-line rationale and citations to specific requests; citing a request the model was not shown fails the scoring. The prompt holds the strategy, the statement and the newest 30 requests and +1 notes. In the ranking, a score maps to 0–1 ((value − 1) / 4), Effort inverted (less effort ranks higher), and a never-scored criterion counts as the middle (0.5).
+- LLM scores are **stale** on new evidence (a submitted request joining or leaving the Problem, a +1 with a note) or a strategy-doc change. Staleness is derived, not flagged: each score stores fingerprints of the evidence and strategy it saw, compared on read, so intake, review and merges need no stale triggers. PM rescores one Problem, or "Rescore all stale" scores every stale or unscored one in the background (after the response). No automatic rescoring.
+- Final rank = PM-weighted sum computed in code. PM can override any score with a required reason; the override is logged, shown beside the AI score, used in the ranking and kept across rescores.
 
 ## Decisions and communication
 
 - **Decision brief** — generated on demand per Problem by a tool-using agent: problem statement, who's asking (segments, ARR), representative quotes, score breakdown, 2–3 solution options, open questions/risks.
 - **Decision** — PM records `Planned | Under review | Declined | Shipped` + rationale.
-- **Stakeholder updates** — on status change, two drafts: customer-facing (built from statement, decision and public rationale only) and internal (full context, sales/CS talking points). PM edits and approves; approved updates go to an in-app notification feed for every supporter.
+- **Stakeholder updates** — on status change, two drafts: customer-facing (built from statement, decision and public rationale only) and internal (full context, sales/CS talking points). PM edits and approves; approved updates go to an in-app notification feed for every supporter. Both drafts are reasoning-tier structured calls (thinking off) run in parallel after the decision commits; the internal one also gets the backing accounts (name, segment, ARR, churn risk), the newest +1 notes and the strategy. If drafting fails the decision stands and the PM drafts again; a new decision replaces drafts nobody approved. Approving a customer update notifies every supporter and adds it to the Problem's public update feed; an approved internal update stays on the Problem for the PM to pass on. Notifications have no read state yet.
 
 ## AI architecture
 
@@ -97,7 +97,7 @@ Rows are checked top to bottom. The creation lock re-checks only Problems create
 
 Role switcher (Submitter / PM) instead of auth.
 
-- **Submitter:** Explore (Problems, semantic search, +1), Submit (two-step with live matches, clarifying question, result + split-out), Problem detail (statement, status, public rationale, anonymized Requests such as "a Mid-market customer", update feed), My requests + notifications (incl. drafts).
+- **Submitter:** Explore (Problems, semantic search, +1), Submit (two-step with live matches, clarifying question, result + split-out), Problem detail (statement, status, public rationale, anonymized Requests such as "a Mid-market customer", update feed), My requests + notifications (incl. drafts). Explore search embeds the query and ranks Problems by their closest submitted Request (top 10, no LLM call), optionally within one status.
 - **PM (adds):** Review queue (accept / move / split), Prioritization (weights, breakdown, stale badges, override), Problem PM view (statement history + lock, merge/split, brief, decision, update drafts + approve), Strategy & settings (`matchMode`, `maxClarifyingQuestions` editable; thresholds read-only), Metrics (+ latest eval results).
 
 ## Metrics

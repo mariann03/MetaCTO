@@ -364,6 +364,22 @@ Response: Moved plural() to src/lib/utils.ts and used it in the Priorities table
 Prompt: apply the ponytail cuts, then merge
 Response: rank() now computes the maxima once and scores with an object literal (no scorer factory), dropped the unused RankedProblem type, plain useState for weights, looped the status updates in the test (-17 lines). Unit and E2E suites pass. Merged PR #27; #12 closed.
 
+[2026-10-13T05:10:00Z]
+Prompt: okay I need to keep moving and this is taking too long, can we continue with other tasks that are no blocked by this one?
+Response: Left the #23 eval running and started #9 in a separate git worktree (branch feat/9-problem-detail): Explore semantic search and status filter, a Problem page with status, supporters, decision and update placeholders and requests anonymized to the customer's segment. Service tests and an Explore E2E pass.
+
+[2026-10-13T06:20:00Z]
+Prompt: looking good, merge it, and suggest the next one
+Response: Merged PR #28 (#9 closed) and updated main in the worktree. Suggested #13 (AI scoring, strategy doc, staleness, overrides) next, with #15 (decisions and updates) right after since #9 unblocked it.
+
+[2026-10-13T06:25:00Z]
+Prompt: /mattpocock-skills:implement #13
+Response: Branch feat/13-ai-scoring (in the worktree). Added AI scoring: a scores table (1-5 per criterion, rationale, cited requests, PM override with reason), one structured reasoning call per Problem against the strategy, staleness derived from evidence and strategy fingerprints, Rescore and Rescore all stale (in the background), overrides recorded as events and used in the ranking, the strategy editor in Settings, AI columns and weights on Priorities, and a PM Scores section on the Problem page. The seed now scores every Problem. Service and E2E tests pass.
+
+[2026-10-13T07:10:00Z]
+Prompt: looks good, next
+Response: Started #15 (decisions and updates) on feat/15-decisions-updates, stacked on the #13 branch since PR #29 is not merged yet. PMs record a decision (status and public rationale); two updates are drafted in parallel, the customer one from public facts only; the PM edits and approves each; an approved customer update notifies every supporter and appears on the Problem's feed; submitters get a Notifications page. Service and E2E tests pass.
+
 [2026-10-13T09:00:00Z]
 Prompt: /mattpocock-skills:implement #23
 Response: Branch feat/23-duplicate-recall. Made the eval compare intake setups: --intake-model, --candidates and --reasoning flags, per-request model time (stored with each cache entry so replays report live latency), per-setup results in data/eval/runs/, and a prompt id so prompt variants stay apart. Ran the current setup and 5 candidates; the qwen3.6:27b run was stopped at 70/150 for low memory.
@@ -371,7 +387,3 @@ Response: Branch feat/23-duplicate-recall. Made the eval compare intake setups: 
 [2026-10-13T09:05:00Z]
 Prompt: continue now
 Response: Resumed the #23 evals: qwen3.6:27b alone (nothing else loaded in Ollama), then gemma with reasoning on, then the prompt variant.
-
-[2026-10-13T06:20:00Z]
-Prompt: looking good, merge it, and suggest the next one
-Response: Merged PR #28 (#9 closed) and updated main in the worktree. Suggested #13 (AI scoring, strategy doc, staleness, overrides) next, with #15 (decisions and updates) right after since #9 unblocked it.

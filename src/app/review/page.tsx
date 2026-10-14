@@ -65,7 +65,7 @@ async function Queue() {
 
   const [queue, problems] = await Promise.all([
     listReviewQueue(deps),
-    listProblems(deps, current.id),
+    listProblems(deps, { viewerId: current.id }),
   ]);
   if (queue.length === 0)
     return <p className="text-muted-foreground">Nothing to review.</p>;

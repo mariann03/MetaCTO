@@ -1,9 +1,38 @@
 import { embed } from "ai";
-import { asc, count, desc, eq, inArray, type SQL, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  cosineDistance,
+  count,
+  desc,
+  eq,
+  inArray,
+  isNotNull,
+  type SQL,
+  sql,
+} from "drizzle-orm";
 import type { Db } from "@/db/client";
-import { events, problems, supports } from "@/db/schema";
+import {
+  accounts,
+  decisions,
+  events,
+  problemStatus,
+  problems,
+  requests,
+  supports,
+  updates,
+  users,
+} from "@/db/schema";
+import { latestDecision } from "./decisions";
 import type { DbDeps, Deps } from "./deps";
 import { embeddingText, findCandidates } from "./intake";
+
+export const PROBLEM_STATUSES = problemStatus.enumValues;
+export type ProblemStatus = (typeof PROBLEM_STATUSES)[number];
+/** Decided Problems no longer compete for priority; planned ones still do. */
+export const DECIDED: ProblemStatus[] = ["shipped", "declined"];
+// ponytail: a fixed page of results; paginate when people need more than the closest few.
+const SEARCH_RESULTS = 10;
 
 /** Problems with how many people support them, and whether the viewer is one of them. */
 function problemSummaries(db: Db, viewerId: number, where?: SQL) {
@@ -11,6 +40,7 @@ function problemSummaries(db: Db, viewerId: number, where?: SQL) {
     .select({
       id: problems.id,
       statement: problems.statement,
+      status: problems.status,
       supporters: count(supports.id),
       supported: sql<boolean>`coalesce(bool_or(${supports.userId} = ${viewerId}), false)`,
     })
@@ -20,15 +50,104 @@ function problemSummaries(db: Db, viewerId: number, where?: SQL) {
     .groupBy(problems.id);
 }
 
-/** Every Problem, most supported first. */
-export async function listProblems({ db }: DbDeps, viewerId: number) {
-  return problemSummaries(db, viewerId).orderBy(
-    desc(count(supports.id)),
-    asc(problems.id),
-  );
+/** Every Problem, or those with one status, most supported first. */
+export async function listProblems(
+  { db }: DbDeps,
+  { viewerId, status }: { viewerId: number; status?: ProblemStatus },
+) {
+  return problemSummaries(
+    db,
+    viewerId,
+    status && eq(problems.status, status),
+  ).orderBy(desc(count(supports.id)), asc(problems.id));
 }
 
 export type ProblemSummary = Awaited<ReturnType<typeof listProblems>>[number];
+
+/**
+ * A Problem as anyone may see it: its latest decision, its approved customer updates and the
+ * requests behind it, oldest first. Requests are
+ * anonymized: only the author's customer segment is shown, never who or which account.
+ */
+export async function getProblem(
+  { db }: DbDeps,
+  viewerId: number,
+  problemId: number,
+) {
+  const [problem] = await problemSummaries(
+    db,
+    viewerId,
+    eq(problems.id, problemId),
+  );
+  if (!problem) return null;
+  const requestsBehind = db
+    .select({
+      id: requests.id,
+      title: requests.title,
+      description: requests.description,
+      segment: accounts.segment,
+    })
+    .from(requests)
+    .innerJoin(users, eq(users.id, requests.authorId))
+    .leftJoin(accounts, eq(accounts.id, users.accountId))
+    .where(
+      and(eq(requests.problemId, problemId), eq(requests.status, "submitted")),
+    )
+    .orderBy(asc(requests.createdAt), asc(requests.id));
+  const decision = latestDecision(db, problemId);
+  // The public feed: approved customer updates, newest first.
+  const feed = db
+    .select({
+      id: updates.id,
+      body: updates.body,
+      approvedAt: updates.approvedAt,
+    })
+    .from(updates)
+    .innerJoin(decisions, eq(decisions.id, updates.decisionId))
+    .where(
+      and(
+        eq(decisions.problemId, problemId),
+        eq(updates.audience, "customer"),
+        isNotNull(updates.approvedAt),
+      ),
+    )
+    .orderBy(desc(updates.approvedAt), desc(updates.id));
+  const [behind, decided, published] = await Promise.all([
+    requestsBehind,
+    decision,
+    feed,
+  ]);
+  return {
+    ...problem,
+    decision: decided && {
+      status: decided.status,
+      rationale: decided.rationale,
+    },
+    requests: behind,
+    updates: published,
+  };
+}
+
+/** Summaries of ranked Problems, in their rank order, each with its similarity. */
+async function rankedSummaries(
+  db: Db,
+  viewerId: number,
+  ranked: { problemId: number; similarity: number }[],
+) {
+  if (ranked.length === 0) return [];
+  const summaries = await problemSummaries(
+    db,
+    viewerId,
+    inArray(
+      problems.id,
+      ranked.map((r) => r.problemId),
+    ),
+  );
+  return ranked.flatMap(({ problemId, similarity }) => {
+    const summary = summaries.find((s) => s.id === problemId);
+    return summary ? [{ ...summary, similarity }] : [];
+  });
+}
 
 /**
  * Problems that look like what the user is writing, closest first: the request text is
@@ -50,22 +169,44 @@ export async function findMatches(
   const candidates = await db.transaction((tx) =>
     findCandidates(tx, embedding),
   );
-  if (candidates.length === 0) return [];
-  const summaries = await problemSummaries(
-    db,
-    viewerId,
-    inArray(
-      problems.id,
-      candidates.map((c) => c.problemId),
-    ),
-  );
-  return candidates.flatMap(({ problemId, similarity }) => {
-    const summary = summaries.find((s) => s.id === problemId);
-    return summary ? [{ ...summary, similarity }] : [];
-  });
+  return rankedSummaries(db, viewerId, candidates);
 }
 
-/** Where a +1 came from: the submit page (instead of filing a request), or Explore. */
+/**
+ * Explore search: Problems whose requests mean something close to the query, closest
+ * first, each at its best-matching request. Embedding only, no LLM call.
+ */
+export async function searchProblems(
+  { db, models }: Deps,
+  {
+    viewerId,
+    query,
+    status,
+  }: { viewerId: number; query: string; status?: ProblemStatus },
+) {
+  const { embedding } = await embed({ model: models.embedding, value: query });
+  const similarity = sql<number>`max(1 - (${cosineDistance(requests.embedding, embedding)}))`;
+  // ponytail: scans every submitted request (no HNSW index use with the group by); fine for thousands, an index-backed top-k pool beyond.
+  const ranked = await db
+    .select({
+      problemId: problems.id,
+      similarity: similarity.mapWith(Number),
+    })
+    .from(requests)
+    .innerJoin(problems, eq(problems.id, requests.problemId))
+    .where(
+      and(
+        eq(requests.status, "submitted"),
+        status && eq(problems.status, status),
+      ),
+    )
+    .groupBy(problems.id)
+    .orderBy(desc(similarity), asc(problems.id))
+    .limit(SEARCH_RESULTS);
+  return rankedSummaries(db, viewerId, ranked);
+}
+
+/** Where a +1 came from: the submit page (instead of filing a request), or Explore (its list or a Problem page). */
 export const SUPPORT_SOURCES = ["submit", "explore"] as const;
 export type SupportSource = (typeof SUPPORT_SOURCES)[number];
 

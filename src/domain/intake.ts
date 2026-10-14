@@ -724,6 +724,7 @@ async function analyze(
 export function embeddingText(
   request: Pick<RequestText, "title" | "description">,
 ) {
+  // The E2E fake embedding reads the title back as the text before the blank line.
   return `${request.title}\n\n${request.description}`;
 }
 
@@ -859,7 +860,7 @@ export async function findCandidates(
 }
 
 /** Keeps customer text from closing the prompt's delimiter tags. */
-function escapeMarkup(text: string) {
+export function escapeMarkup(text: string) {
   return text
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
