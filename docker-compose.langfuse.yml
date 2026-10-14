@@ -1,10 +1,13 @@
 # Optional, local tracing: self-hosted Langfuse v4 (web, worker, Postgres, ClickHouse,
 # Redis, MinIO), adapted from Langfuse's own docker-compose.yml.
-#   docker compose -f docker-compose.langfuse.yml up -d   # UI on http://localhost:3001
+#   bun run langfuse:up      # UI on http://localhost:3001 (bun run langfuse:down stops it)
 # Ports avoid the app's: the UI is on 3001 and MinIO on 9092, both bound to this machine
 # only (traces hold customer text); the rest stay inside Docker.
 # The secrets below are local-only placeholders; never reuse them on a reachable host.
 # A project with the keys in .env.example is created on first start (login: dev@example.com).
+# One project name from any checkout or worktree, so up and down always find the same stack.
+name: metacto-langfuse
+
 x-langfuse-env: &langfuse-env
   NEXTAUTH_URL: http://localhost:3001
   DATABASE_URL: postgresql://postgres:postgres@langfuse-postgres:5432/postgres

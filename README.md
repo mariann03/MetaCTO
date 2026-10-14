@@ -67,7 +67,7 @@ bun run test:e2e       # Playwright against a production build with a determinis
 bun run eval           # matching accuracy on the labeled fixtures (replays from the cache)
 ```
 
-**Tracing (optional).** `docker compose -f docker-compose.langfuse.yml up -d` starts a local Langfuse on http://localhost:3001 (login `dev@example.com` / `local-password`). Uncomment the three `LANGFUSE_*` lines in `.env` and restart the app: every AI call then appears as a trace with its prompt, output, tokens and latency, including the brief agent's tool calls. Without them, tracing is not loaded at all.
+**Tracing (optional).** `bun run langfuse:up` starts a local Langfuse on http://localhost:3001 (`bun run langfuse:down` stops it, keeping its data) (login `dev@example.com` / `local-password`). Uncomment the three `LANGFUSE_*` lines in `.env` and restart the app: every AI call then appears as a trace with its prompt, output, tokens and latency, including the brief agent's tool calls. Without them, tracing is not loaded at all.
 
 ## Deploying
 

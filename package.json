@@ -16,6 +16,8 @@
     "test:e2e": "playwright test",
     "seed": "bun scripts/seed.ts",
     "eval": "bun scripts/eval.ts",
+    "langfuse:up": "docker compose -f docker-compose.langfuse.yml up -d --wait",
+    "langfuse:down": "docker compose -f docker-compose.langfuse.yml down",
     "reembed": "bun scripts/reembed.ts"
   },
   "dependencies": {
