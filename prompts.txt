@@ -368,6 +368,10 @@ Response: rank() now computes the maxima once and scores with an object literal 
 Prompt: okay I need to keep moving and this is taking too long, can we continue with other tasks that are no blocked by this one?
 Response: Left the #23 eval running and started #9 in a separate git worktree (branch feat/9-problem-detail): Explore semantic search and status filter, a Problem page with status, supporters, decision and update placeholders and requests anonymized to the customer's segment. Service tests and an Explore E2E pass.
 
+[2026-10-13T06:20:00Z]
+Prompt: looking good, merge it, and suggest the next one
+Response: Merged PR #28 (#9 closed) and updated main in the worktree. Suggested #13 (AI scoring, strategy doc, staleness, overrides) next, with #15 (decisions and updates) right after since #9 unblocked it.
+
 [2026-10-13T06:25:00Z]
 Prompt: /mattpocock-skills:implement #13
 Response: Branch feat/13-ai-scoring (in the worktree). Added AI scoring: a scores table (1-5 per criterion, rationale, cited requests, PM override with reason), one structured reasoning call per Problem against the strategy, staleness derived from evidence and strategy fingerprints, Rescore and Rescore all stale (in the background), overrides recorded as events and used in the ranking, the strategy editor in Settings, AI columns and weights on Priorities, and a PM Scores section on the Problem page. The seed now scores every Problem. Service and E2E tests pass.
@@ -387,6 +391,22 @@ Response: Suggested #11 (merge Problems; edit, lock and version statements) as n
 [2026-10-13T08:12:00Z]
 Prompt: /mattpocock-skills:implement #11
 Response: Branch feat/11-merge-lock. PMs merge a duplicate Problem into another (requests and supports move, a supporter of both counted once with their note kept, source deleted, event logged; a decided source is refused), edit and lock statements (PM-authored versions, AI never rewrites a locked statement) and see the version history. Service and E2E tests pass.
+
+[2026-10-13T09:00:00Z]
+Prompt: /mattpocock-skills:implement #23
+Response: Branch feat/23-duplicate-recall. Made the eval compare intake setups: --intake-model, --candidates and --reasoning flags, per-request model time (stored with each cache entry so replays report live latency), per-setup results in data/eval/runs/, and a prompt id so prompt variants stay apart. Ran the current setup and 5 candidates; the qwen3.6:27b run was stopped at 70/150 for low memory.
+
+[2026-10-13T09:05:00Z]
+Prompt: continue now
+Response: Resumed the #23 evals: qwen3.6:27b alone (nothing else loaded in Ollama), then gemma with reasoning on, then the prompt variant.
+
+[2026-10-14T00:30:00Z]
+Prompt: (chose "gemma, thinking on" for #23's intake setup)
+Response: Adopted gemma4:12b with thinking on for intake (INTAKE_SETUP reasoning provider-default) and raised the per-attempt timeout to 2 minutes; reverted both prompt variants. Replayed the eval for latest.json, wrote docs/eval-intake-setups.md with the comparison and trade-off, corrected the latency claims in the design doc, and started the re-seed (live intake with thinking on, then qwen scores).
+
+[2026-10-14T04:06:00Z]
+Prompt: #31 looks good to merge
+Response: Merged PR #31 (#11 closed) and merged the new main into the #23 branch.
 
 [2026-10-14T04:20:00Z]
 Prompt: /mattpocock-skills:implement #16
@@ -412,10 +432,26 @@ Response: Merged PR #33 (#14 closed). Suggested #7 (clarifying questions) next; 
 Prompt: /mattpocock-skills:implement #7
 Response: Branch feat/7-clarifying-questions. On Next, a fast-tier call (thinking off) asks up to maxClarifyingQuestions questions when a request names a solution without the need (0 skips the call); each is optional and skippable; answers are stored with the request, shown on the Problem page and added to the intake prompt (unchanged without answers, so cached answers replay); the PM sets the limit (0-3) in Settings. Also fixed the #23 seed to leave a Problem unscored when its scoring is rejected, and restarted it.
 
+[2026-10-14T06:30:00Z]
+Prompt: vercel + neon is for the "production build" the tunnel is just for the demo. we are not using vercel + neon right now but the app should be able to use that setup later
+Response: Checked the app is ready for Vercel + Neon (pooled/direct URLs, attachDatabasePool, pgvector via migration; hosted models and per-model thresholds are configuration). Added a Deploying section to the README (production path steps, and the demo via the local build behind the Cloudflare Tunnel) and updated the design doc's infra line.
+
+[2026-10-14T06:40:00Z]
+Prompt: looks good, merge it
+Response: Merged PR #34 (#7 closed); main updated in the worktree.
+
+[2026-10-14T06:45:00Z]
+Prompt: /mattpocock-skills:implement #17
+Response: Branch feat/17-langfuse. Asked which tracing packages and Langfuse version to use (chose @langfuse/vercel-ai-sdk + @langfuse/otel + @opentelemetry/sdk-node, and langfuse:4). Tracing starts in src/instrumentation.ts only when all LANGFUSE_* vars are set; every AI call is named (intake-analysis, scoring, decision-brief, ...); a local Langfuse stack is in docker-compose.langfuse.yml with non-clashing ports and a pre-created project.
+
+[2026-10-14T06:45:00Z]
+Prompt: merge #35 and do the langfuse check
+Response: Merged PR #35 (#23 closed). Brought feat/17-langfuse up to date, started the local Langfuse 4.58 stack (project created from the init keys), and ran the submit, scoring, decisions, brief and clarify E2E specs against a build with LANGFUSE_* set: 20 traces arrived, with intake-analysis, clarifying-questions, scoring, update-draft-customer/internal and decision-brief (with its get_problem/list_requests tool calls), each with prompt, output, tokens and latency. Named the OTel service.
+
 [2026-10-14T07:10:00Z]
 Prompt: can we do something else in the meanwhile?
 Response: Committed the #17 work in progress and drafted the README on feat/18-readme (local setup, architecture, AI design decisions, human-in-the-loop points, metrics, assumptions, risks and trade-offs), which needs no models while the seed runs. Deploy and #19 wait on decisions.
 
-[2026-10-14T06:30:00Z]
-Prompt: vercel + neon is for the "production build" the tunnel is just for the demo. we are not using vercel + neon right now but the app should be able to use that setup later
-Response: Checked the app is ready for Vercel + Neon (pooled/direct URLs, attachDatabasePool, pgvector via migration; hosted models and per-model thresholds are configuration). Added a Deploying section to the README (production path steps, and the demo via the local build behind the Cloudflare Tunnel) and updated the design doc's infra line.
+[2026-10-14T07:40:00Z]
+Prompt: is there anything else we can run in parallel?
+Response: While the vscode eval runs, refreshed the #18 README against main in a separate worktree (../MetaCTO-18) and offered a Loom demo script; listed the pending decisions (Cloudflare Access, keeping the demo up as services, stopping the Langfuse stack).

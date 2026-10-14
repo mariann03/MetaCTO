@@ -127,6 +127,8 @@ The PM Metrics page computes, in SQL over the event log:
 
 Before real usage, the offline evaluation is the baseline, shown on the same page. On the held-out requests the adopted setup groups 53% of duplicates correctly with 77% precision on the requests it sends to review, keeps 80% of new needs separate, and finds the right Problem among its 3 candidates 76% of the time.
 
+**On real data.** The fixtures are synthetic, so the same setup is also measured on 325 real microsoft/vscode feature requests, 103 of them duplicates its maintainers marked (`bun run eval --dataset vscode`). Their duplicate labels are incomplete, so precision there is a lower bound. VSCODE_RESULTS
+
 ## Assumptions
 
 - One workspace; customers are identified by a seeded directory (accounts with ARR, segment and churn risk). No real auth, CRM sync or intake from email, Slack or support tools.
@@ -136,7 +138,7 @@ Before real usage, the offline evaluation is the baseline, shown on the same pag
 
 ## Risks and trade-offs
 
-- **Latency for accuracy.** Thinking on makes a submission wait about 30 s (up to ~78 s at p90). Moving analysis after submission would remove the wait; the product would then tell the customer when their request was grouped.
+- **Latency for accuracy.** Thinking on makes a submission wait about 30 s (about 74 s at p90). Moving analysis after submission would remove the wait; the product would then tell the customer when their request was grouped.
 - **Little auto-grouping.** With 150 labeled requests, auto-grouping can rarely be shown to be 95% precise, so PMs review most groupings. More labeled data (or a stronger model) is what unlocks hands-off triage.
 - **Prompt injection.** Customer text is passed as delimited, escaped data and model outputs are validated, which limits but cannot rule out manipulation. The worst case is a wrong grouping or a weak draft, both of which a PM reviews.
 - **No moderation or PII scrubbing.** Request text is shown to other customers word for word (authors are anonymized to their segment). This is a known risk, not handled here.
@@ -152,7 +154,7 @@ Before real usage, the offline evaluation is the baseline, shown on the same pag
 | `src/ai/` | Model registry, response cache, the E2E fake |
 | `src/db/`, `drizzle/` | Schema and migrations |
 | `data/fixtures/` | Accounts, people, labeled requests, strategy |
-| `data/cache/`, `data/eval/` | Cached model answers; eval results and tuned thresholds |
-| `scripts/` | `seed`, `eval`, `reembed`, fixture validation |
+| `data/cache/`, `data/eval/` | Cached model answers; eval results and tuned thresholds; the eval-only vscode dataset (`data/eval/oss/`) |
+| `scripts/` | `seed`, `eval`, `reembed`, the vscode dataset builder, fixture validation |
 | `e2e/` | Playwright specs |
 | `docs/` | Design, eval notes, verified library notes |

@@ -166,6 +166,7 @@ export async function findMatches(
   const { embedding } = await embed({
     model: models.embedding,
     value: embeddingText({ title, description }),
+    telemetry: { functionId: "live-match" },
   });
   const candidates = await db.transaction((tx) =>
     findCandidates(tx, embedding),
@@ -185,7 +186,11 @@ export async function searchProblems(
     status,
   }: { viewerId: number; query: string; status?: ProblemStatus },
 ) {
-  const { embedding } = await embed({ model: models.embedding, value: query });
+  const { embedding } = await embed({
+    model: models.embedding,
+    value: query,
+    telemetry: { functionId: "explore-search" },
+  });
   const similarity = sql<number>`max(1 - (${cosineDistance(requests.embedding, embedding)}))`;
   // ponytail: scans every submitted request (no HNSW index use with the group by); fine for thousands, an index-backed top-k pool beyond.
   const ranked = await db
