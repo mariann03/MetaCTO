@@ -8,7 +8,7 @@ import {
 } from "bun:test";
 import { eq, inArray } from "drizzle-orm";
 import type { Db } from "@/db/client";
-import { EMBEDDING_DIMENSIONS, events, supports } from "@/db/schema";
+import { EMBEDDING_DIMENSIONS, events, problems, supports } from "@/db/schema";
 import { candidateIds, jsonResult, scriptedModels } from "../../test/ai";
 import {
   prepareDatabase,
@@ -18,7 +18,13 @@ import {
 import { seedPeople } from "../../test/seed";
 import type { Deps } from "./deps";
 import { submitRequest } from "./intake";
-import { addSupport, findMatches, listProblems } from "./problems";
+import {
+  addSupport,
+  findMatches,
+  getProblem,
+  listProblems,
+  searchProblems,
+} from "./problems";
 
 /** Unit vector with these components on the first axes. */
 function vector(...components: number[]): number[] {
@@ -123,6 +129,7 @@ describe("findMatches", () => {
       {
         id: invoices,
         statement: "Statement for Invoices A",
+        status: "open",
         supporters: 2,
         supported: true,
         similarity: expect.closeTo(0.647, 2),
@@ -130,6 +137,7 @@ describe("findMatches", () => {
       {
         id: payroll,
         statement: "Statement for Payroll",
+        status: "open",
         supporters: 2,
         supported: false,
         similarity: expect.closeTo(0.539, 2),
@@ -137,6 +145,7 @@ describe("findMatches", () => {
       {
         id: receipts,
         statement: "Statement for Receipts",
+        status: "open",
         supporters: 1,
         supported: false,
         similarity: expect.closeTo(0.431, 2),
@@ -152,6 +161,77 @@ describe("findMatches", () => {
         description: "What I typed so far.",
       }),
     ).toEqual([]);
+  });
+});
+
+describe("getProblem", () => {
+  test("shows the Problem with its requests, oldest first, naming only each customer's segment", async () => {
+    const invoices = await submit("Invoices A");
+    expect(await submit("Invoices B", people.priya)).toBe(invoices);
+
+    expect(await getProblem(deps(db), people.bob, invoices)).toEqual({
+      id: invoices,
+      statement: "Statement for Invoices A",
+      status: "open",
+      supporters: 2,
+      supported: false,
+      requests: [
+        {
+          id: expect.any(Number),
+          title: "Invoices A",
+          description: "Details of the need.",
+          segment: "smb",
+        },
+        // Priya belongs to no account.
+        {
+          id: expect.any(Number),
+          title: "Invoices B",
+          description: "Details of the need.",
+          segment: null,
+        },
+      ],
+    });
+  });
+
+  test("finds nothing for an unknown Problem", async () => {
+    expect(await getProblem(deps(db), people.bob, 404)).toBeNull();
+  });
+});
+
+describe("searchProblems", () => {
+  test("ranks Problems by meaning, each at its closest request, within a status", async () => {
+    const invoices = await submit("Invoices A");
+    await submit("Invoices B", people.bob);
+    const payroll = await submit("Payroll");
+    const receipts = await submit("Receipts");
+    await db
+      .update(problems)
+      .set({ status: "planned" })
+      .where(eq(problems.id, receipts));
+    const { models, language } = scripted();
+    const search = (status?: "planned") =>
+      searchProblems(
+        { db, models },
+        { viewerId: people.bob, query: "Query", status },
+      );
+
+    // "Query" shares no words with the requests; only their meaning is close.
+    expect((await search()).map((p) => p.id)).toEqual([
+      invoices,
+      payroll,
+      receipts,
+    ]);
+    expect(await search("planned")).toEqual([
+      {
+        id: receipts,
+        statement: "Statement for Receipts",
+        status: "planned",
+        supporters: 1,
+        supported: false,
+        similarity: expect.closeTo(0.431, 2),
+      },
+    ]);
+    expect(language.doGenerateCalls).toHaveLength(0);
   });
 });
 
@@ -215,7 +295,7 @@ describe("addSupport", () => {
 });
 
 describe("listProblems", () => {
-  test("lists every Problem, most supported first, marking the viewer's", async () => {
+  test("lists every Problem, or those with one status, most supported first, marking the viewer's", async () => {
     const payroll = await submit("Payroll");
     const receipts = await submit("Receipts");
     await addSupport(deps(db), {
@@ -224,20 +304,34 @@ describe("listProblems", () => {
       note: null,
       source: "explore",
     });
+    await db
+      .update(problems)
+      .set({ status: "planned" })
+      .where(eq(problems.id, payroll));
 
-    expect(await listProblems(deps(db), people.bob)).toEqual([
+    expect(await listProblems(deps(db), { viewerId: people.bob })).toEqual([
       {
         id: receipts,
         statement: "Statement for Receipts",
+        status: "open",
         supporters: 2,
         supported: true,
       },
       {
         id: payroll,
         statement: "Statement for Payroll",
+        status: "planned",
         supporters: 1,
         supported: false,
       },
     ]);
+    expect(
+      (
+        await listProblems(deps(db), {
+          viewerId: people.bob,
+          status: "planned",
+        })
+      ).map((p) => p.id),
+    ).toEqual([payroll]);
   });
 });

@@ -12,16 +12,12 @@ import {
 } from "@/components/ui/table";
 import type { ProblemCriteria } from "@/domain/prioritization";
 import { CRITERIA, type Criterion, rank, type Weights } from "@/domain/ranking";
+import { SEGMENT_LABELS } from "@/lib/labels";
 import { plural } from "@/lib/utils";
 
 const NAME: Record<Criterion, string> = {
   reach: "Reach",
   businessValue: "Business value",
-};
-const SEGMENT: Record<keyof ProblemCriteria["segments"], string> = {
-  smb: "SMB",
-  mid_market: "Mid-market",
-  enterprise: "Enterprise",
 };
 const MAX_WEIGHT = 10;
 const DEFAULT_WEIGHT = 5;
@@ -106,7 +102,7 @@ export function Ranking({ criteria }: { criteria: ProblemCriteria[] }) {
                     .filter(([, n]) => n > 0)
                     .map(
                       ([segment, n]) =>
-                        `${n} ${SEGMENT[segment as keyof typeof SEGMENT]}`,
+                        `${n} ${SEGMENT_LABELS[segment as keyof ProblemCriteria["segments"]]}`,
                     )
                     .join(", ")}
                 </div>
