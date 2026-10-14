@@ -97,7 +97,7 @@ Rows are checked top to bottom. The creation lock re-checks only Problems create
 
 Role switcher (Submitter / PM) instead of auth.
 
-- **Submitter:** Explore (Problems, semantic search, +1), Submit (two-step with live matches, clarifying question, result + split-out), Problem detail (statement, status, public rationale, anonymized Requests such as "a Mid-market customer", update feed), My requests + notifications (incl. drafts). Explore search embeds the query and ranks Problems by their closest submitted Request (top 10, no LLM call), optionally within one status.
+- **Submitter:** Explore (Problems, semantic search, +1), Submit (two-step with live matches, clarifying question, result + split-out), Problem detail (statement, status, public rationale, anonymized Requests such as "a Mid-market customer"; Requests by our own team, users with no account, can name customers and ARR, so only our team sees them, as "Our team"; update feed), My requests + notifications (incl. drafts). Explore search embeds the query and ranks Problems by their closest submitted Request (top 10, no LLM call), optionally within one status.
 - **PM (adds):** Review queue (accept / move / split), Prioritization (weights, breakdown, stale badges, override), Problem PM view (statement history + lock, merge/split, brief, decision, update drafts + approve), Strategy & settings (`matchMode`, `maxClarifyingQuestions` editable; thresholds read-only), Metrics (+ latest eval results).
 
 ## Metrics

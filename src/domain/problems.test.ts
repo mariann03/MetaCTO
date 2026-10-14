@@ -165,8 +165,9 @@ describe("findMatches", () => {
 });
 
 describe("getProblem", () => {
-  test("shows the Problem with its requests, oldest first, naming only each customer's segment", async () => {
+  test("shows a customer the Problem with its customers' requests, oldest first, naming only each one's segment", async () => {
     const invoices = await submit("Invoices A");
+    // Priya belongs to no account: her request is internal.
     expect(await submit("Invoices B", people.priya)).toBe(invoices);
 
     expect(await getProblem(deps(db), people.bob, invoices)).toEqual({
@@ -185,16 +186,22 @@ describe("getProblem", () => {
           clarifications: [],
           segment: "smb",
         },
-        // Priya belongs to no account.
-        {
-          id: expect.any(Number),
-          title: "Invoices B",
-          description: "Details of the need.",
-          clarifications: [],
-          segment: null,
-        },
       ],
     });
+  });
+
+  test("shows a PM the internal requests too, without a segment", async () => {
+    const invoices = await submit("Invoices A");
+    await submit("Invoices B", people.priya);
+
+    expect(
+      (await getProblem(deps(db), people.priya, invoices))?.requests.map(
+        (r) => [r.title, r.segment],
+      ),
+    ).toEqual([
+      ["Invoices A", "smb"],
+      ["Invoices B", null],
+    ]);
   });
 
   test("finds nothing for an unknown Problem", async () => {

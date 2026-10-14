@@ -25,6 +25,7 @@ import {
 } from "@/db/schema";
 import { latestDecision } from "./decisions";
 import type { DbDeps, Deps } from "./deps";
+import { isOurTeam } from "./directory";
 import { embeddingText, findCandidates } from "./intake";
 
 export const PROBLEM_STATUSES = problemStatus.enumValues;
@@ -65,9 +66,11 @@ export async function listProblems(
 export type ProblemSummary = Awaited<ReturnType<typeof listProblems>>[number];
 
 /**
- * A Problem as anyone may see it: its latest decision, its approved customer updates and the
- * requests behind it, oldest first. Requests are
+ * A Problem as the viewer may see it: its latest decision, its approved customer updates and
+ * the requests behind it, oldest first. Requests are
  * anonymized: only the author's customer segment is shown, never who or which account.
+ * Requests our team wrote (authors with no account) can name customers and their ARR, so a
+ * customer sees only customers' requests.
  */
 export async function getProblem(
   { db }: DbDeps,
@@ -80,6 +83,7 @@ export async function getProblem(
     eq(problems.id, problemId),
   );
   if (!problem) return null;
+  const ourTeam = await isOurTeam({ db }, viewerId);
   const requestsBehind = db
     .select({
       id: requests.id,
@@ -92,7 +96,11 @@ export async function getProblem(
     .innerJoin(users, eq(users.id, requests.authorId))
     .leftJoin(accounts, eq(accounts.id, users.accountId))
     .where(
-      and(eq(requests.problemId, problemId), eq(requests.status, "submitted")),
+      and(
+        eq(requests.problemId, problemId),
+        eq(requests.status, "submitted"),
+        ourTeam ? undefined : isNotNull(users.accountId),
+      ),
     )
     .orderBy(asc(requests.createdAt), asc(requests.id));
   const decision = latestDecision(db, problemId);
