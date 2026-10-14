@@ -4,7 +4,10 @@ import { useActionState } from "react";
 import { type BriefState, generateBriefAction } from "@/app/actions";
 import { Button } from "@/components/ui/button";
 
-/** Starts the brief agent in the background; it reads the evidence for a few minutes. */
+/**
+ * Starts the brief agent in the background; it reads the evidence for a few minutes.
+ * ponytail: nothing stops a second run while one is going; record a running job if PMs double-click.
+ */
 export function BriefButton({
   problemId,
   again,

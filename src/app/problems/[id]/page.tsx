@@ -12,7 +12,7 @@ import { ProblemStatusBadge } from "@/components/problem-status";
 import { ScoreValue } from "@/components/score-value";
 import { OverrideForm, RescoreButton } from "@/components/scoring-controls";
 import { SupportButton } from "@/components/support-button";
-import { type Brief, getLatestBrief } from "@/domain/brief";
+import { type Brief, getLatestBrief, lastBriefFailure } from "@/domain/brief";
 import { isStatementLocked, listVersions } from "@/domain/curation";
 import {
   DECISIONS,
@@ -312,7 +312,10 @@ async function Curation({
   );
 }
 
-/** Where a brief's source id leads: the request below, a Problem, the scores or the strategy. */
+/**
+ * Where a brief's source id leads: the request below, a Problem, the scores or the strategy.
+ * Accounts and +1 notes have no page, so their ids are shown as they are.
+ */
 function sourceHref(source: string, problemId: number) {
   const [kind, id] = source.split(":");
   if (kind === "request") return `#request-${id}`;
@@ -355,7 +358,10 @@ const BRIEF_SECTIONS = [
 
 /** PM only: the agent's latest brief, every claim linked to its sources. */
 async function DecisionBrief({ problemId }: { problemId: number }) {
-  const latest = await getLatestBrief(deps, problemId);
+  const [latest, failedAt] = await Promise.all([
+    getLatestBrief(deps, problemId),
+    lastBriefFailure(deps, problemId),
+  ]);
   const brief = latest?.content;
   return (
     <section aria-label="Decision brief" className="space-y-3">
@@ -363,6 +369,12 @@ async function DecisionBrief({ problemId }: { problemId: number }) {
         <h2 className="font-semibold text-lg">Decision brief</h2>
         <BriefButton problemId={problemId} again={brief !== undefined} />
       </div>
+      {failedAt && (
+        <p role="alert" className="text-sm">
+          The last attempt, on {dateFormat.format(failedAt)}, did not produce a
+          brief that cites its sources. Generate it again.
+        </p>
+      )}
       {latest && brief ? (
         <div className="space-y-4 rounded-md border p-4 text-sm">
           <p className="text-muted-foreground text-xs">
@@ -376,8 +388,9 @@ async function DecisionBrief({ problemId }: { problemId: number }) {
           {brief.quotes.length > 0 && (
             <div className="space-y-1">
               <h3 className="font-medium">Representative quotes</h3>
-              {brief.quotes.map((q) => (
-                <blockquote key={q.quote} className="border-l-2 pl-3">
+              {brief.quotes.map((q, i) => (
+                // biome-ignore lint/suspicious/noArrayIndexKey: model text may repeat; the order is fixed
+                <blockquote key={i} className="border-l-2 pl-3">
                   “{q.quote}”
                   <Sources ids={[q.source]} problemId={problemId} />
                 </blockquote>
@@ -388,8 +401,9 @@ async function DecisionBrief({ problemId }: { problemId: number }) {
             <div key={key} className="space-y-1">
               <h3 className="font-medium">{title}</h3>
               <ul className="list-disc space-y-1 pl-5">
-                {brief[key].map((c) => (
-                  <li key={c.text}>
+                {brief[key].map((c, i) => (
+                  // biome-ignore lint/suspicious/noArrayIndexKey: model text may repeat; the order is fixed
+                  <li key={i}>
                     {c.text}
                     <Sources ids={c.sources} problemId={problemId} />
                   </li>

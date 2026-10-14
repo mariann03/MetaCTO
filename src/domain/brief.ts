@@ -1,5 +1,5 @@
 import { isStepCount, Output, ToolLoopAgent, tool } from "ai";
-import { and, asc, desc, eq, inArray, isNotNull } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import {
   accounts,
@@ -14,13 +14,14 @@ import { latestDecision } from "./decisions";
 import type { DbDeps, Deps } from "./deps";
 import { requirePm } from "./directory";
 import { findCandidates } from "./intake";
+import { listCriteria } from "./prioritization";
 import { getScores } from "./scoring";
 import { getStrategy } from "./settings";
 
 // Enough for one round of every tool plus the answer, with room to look again.
 const STEP_CAP = 8;
-// ponytail: the newest requests only, so a big Problem fits in the context; page through them if briefs miss older evidence.
-const REQUEST_LIMIT = 30;
+// ponytail: the newest requests and notes only, so a big Problem fits in the context; page through them if briefs miss older evidence.
+const EVIDENCE_LIMIT = 30;
 
 const INSTRUCTIONS = `You prepare a decision brief for a product manager at a B2B SaaS company about one Problem: a customer need many requests describe.
 Gather the evidence with the tools first. Each item a tool returns has a source id (such as "request:12", "account:3", "score:urgency", "problem:7" or "strategy").
@@ -53,11 +54,16 @@ export type Brief = z.infer<typeof briefSchema>;
 
 /**
  * Read-only tools over one Problem's evidence. Each result carries the source ids the brief
- * may cite; `seen` collects them, so a citation of anything else can be caught.
+ * may cite; `seen` collects them (with a request's text, which quotes must come from), so a
+ * citation of anything else can be caught.
  */
-function briefTools({ db }: DbDeps, problemId: number, seen: Set<string>) {
-  const cite = (id: string) => {
-    seen.add(id);
+function briefTools(
+  { db }: DbDeps,
+  problemId: number,
+  seen: Map<string, string>,
+) {
+  const cite = (id: string, text = "") => {
+    seen.set(id, text);
     return id;
   };
   const none = z.object({});
@@ -87,7 +93,7 @@ function briefTools({ db }: DbDeps, problemId: number, seen: Set<string>) {
       },
     }),
     list_requests: tool({
-      description: `The requests behind the Problem, newest first (up to ${REQUEST_LIMIT}), with +1 notes.`,
+      description: `The requests behind the Problem, newest first (up to ${EVIDENCE_LIMIT}), with +1 notes.`,
       inputSchema: none,
       execute: async () => {
         const rows = await db
@@ -107,21 +113,24 @@ function briefTools({ db }: DbDeps, problemId: number, seen: Set<string>) {
             ),
           )
           .orderBy(desc(requests.createdAt), desc(requests.id))
-          .limit(REQUEST_LIMIT);
+          .limit(EVIDENCE_LIMIT);
         const notes = await db
-          .select({ note: supports.note })
+          .select({ id: supports.id, note: supports.note })
           .from(supports)
           .where(
             and(eq(supports.problemId, problemId), isNotNull(supports.note)),
           )
           .orderBy(desc(supports.createdAt), desc(supports.id))
-          .limit(REQUEST_LIMIT);
+          .limit(EVIDENCE_LIMIT);
         return {
           requests: rows.map(({ id, ...r }) => ({
-            source: cite(`request:${id}`),
+            source: cite(`request:${id}`, `${r.title}\n${r.description}`),
             ...r,
           })),
-          notes: notes.map((n) => n.note),
+          notes: notes.map((n) => ({
+            source: cite(`note:${n.id}`),
+            note: n.note,
+          })),
         };
       },
     }),
@@ -161,19 +170,22 @@ function briefTools({ db }: DbDeps, problemId: number, seen: Set<string>) {
       description: "Other Problems whose requests are closest to this one's.",
       inputSchema: none,
       execute: async () => {
-        const [first] = await db
-          .select({ embedding: requests.embedding })
+        // The centre of all its requests, so one off-topic request does not decide.
+        const [centre] = await db
+          .select({
+            embedding: sql`avg(${requests.embedding})`.mapWith(
+              requests.embedding,
+            ),
+          })
           .from(requests)
           .where(
             and(
               eq(requests.problemId, problemId),
               isNotNull(requests.embedding),
             ),
-          )
-          .orderBy(asc(requests.createdAt))
-          .limit(1);
-        if (!first?.embedding) return [];
-        const embedding = first.embedding;
+          );
+        if (!centre?.embedding) return [];
+        const embedding = centre.embedding;
         const related = await db.transaction((tx) =>
           findCandidates(tx, embedding, [problemId]),
         );
@@ -201,10 +213,13 @@ function briefTools({ db }: DbDeps, problemId: number, seen: Set<string>) {
     }),
     get_score_history: tool({
       description:
-        "The AI's scores (Strategic fit, Urgency, Effort) with rationale, overrides and staleness, and their history.",
+        "The score breakdown: Reach and Business value (supporters, accounts, ARR, churn risk, segments), and the AI's Strategic fit, Urgency and Effort with rationale, overrides, staleness and history.",
       inputSchema: none,
       execute: async () => {
         const current = await getScores({ db }, problemId);
+        const criteria = (await listCriteria({ db })).find(
+          (c) => c.id === problemId,
+        );
         const history = await db
           .select({
             type: events.type,
@@ -221,6 +236,14 @@ function briefTools({ db }: DbDeps, problemId: number, seen: Set<string>) {
           )
           .orderBy(asc(events.createdAt));
         return {
+          computed: criteria && {
+            source: cite(`problem:${problemId}`),
+            supporters: criteria.supporters,
+            accounts: criteria.accounts,
+            arr: criteria.arr,
+            churnRiskArr: criteria.churnRiskArr,
+            segments: criteria.segments,
+          },
           scores: Object.entries(current).map(([criterion, score]) => ({
             source: cite(`score:${criterion}`),
             criterion,
@@ -244,7 +267,7 @@ export async function generateBrief(
   { userId, problemId }: { userId: number; problemId: number },
 ): Promise<"generated" | "failed"> {
   await requirePm({ db }, userId, "generate a decision brief");
-  const seen = new Set<string>();
+  const seen = new Map<string, string>();
   try {
     const agent = new ToolLoopAgent({
       model: models.reasoning,
@@ -254,27 +277,31 @@ export async function generateBrief(
       stopWhen: isStepCount(STEP_CAP),
       // Depth over speed: it runs on demand, in the background.
       reasoning: "provider-default",
+      // A failed run is logged and the PM asks again; retrying a minutes-long run hides that.
       maxRetries: 0,
     });
     const { output } = await agent.generate({
       prompt: `Prepare the decision brief for Problem ${problemId}.`,
     });
-    const cited = [
-      ...[output.statement, ...output.whoIsAsking, ...output.scores]
-        .concat(output.options, output.risks)
-        .flatMap((c) => c.sources),
-      ...output.quotes.map((q) => q.source),
-    ];
-    const unseen = cited.filter((id) => !seen.has(id));
+    // ponytail: ids prove a source was read, not that it backs the claim; the brief is a draft a PM checks.
+    const unseen = [output.statement, ...output.whoIsAsking, ...output.scores]
+      .concat(output.options, output.risks)
+      .flatMap((c) => c.sources)
+      .filter((id) => !seen.has(id));
     if (unseen.length > 0)
       throw new Error(`The brief cites sources it never read: ${unseen}`);
+    // A quote is kept only if it is copied from the request it cites; models paraphrase.
+    const quotable = (q: { quote: string; source: string }) =>
+      q.source.startsWith("request:") &&
+      normalized(seen.get(q.source) ?? "").includes(normalized(q.quote));
+    const brief: Brief = { ...output, quotes: output.quotes.filter(quotable) };
     await db.transaction(async (tx) => {
       await tx
         .insert(briefs)
-        .values({ problemId, content: output, requestedBy: userId });
+        .values({ problemId, content: brief, requestedBy: userId });
       await tx.insert(events).values({
         type: "brief_generated",
-        actor: "pm",
+        actor: "ai",
         actorId: userId,
         entityType: "problem",
         entityId: problemId,
@@ -286,6 +313,7 @@ export async function generateBrief(
     await db.insert(events).values({
       type: "brief_failed",
       actor: "ai",
+      actorId: userId,
       entityType: "problem",
       entityId: problemId,
       payload: {
@@ -294,6 +322,26 @@ export async function generateBrief(
     });
     return "failed";
   }
+}
+
+const normalized = (text: string) =>
+  text.toLowerCase().replace(/\s+/g, " ").trim();
+
+/** When the Problem's last brief run failed, if no brief has succeeded since; else null. */
+export async function lastBriefFailure({ db }: DbDeps, problemId: number) {
+  const [last] = await db
+    .select({ type: events.type, at: events.createdAt })
+    .from(events)
+    .where(
+      and(
+        eq(events.entityType, "problem"),
+        eq(events.entityId, problemId),
+        inArray(events.type, ["brief_generated", "brief_failed"]),
+      ),
+    )
+    .orderBy(desc(events.createdAt), desc(events.id))
+    .limit(1);
+  return last?.type === "brief_failed" ? last.at : null;
 }
 
 /** The Problem's newest brief, or null. */

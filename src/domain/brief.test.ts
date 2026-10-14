@@ -16,7 +16,7 @@ import {
   TEST_DATABASE_URL,
 } from "../../test/db";
 import { seedPeople } from "../../test/seed";
-import { generateBrief, getLatestBrief } from "./brief";
+import { generateBrief, getLatestBrief, lastBriefFailure } from "./brief";
 import { submitRequest } from "./intake";
 import { writeStrategy } from "./settings";
 
@@ -112,7 +112,10 @@ const snapshot = async () =>
              (select json_agg(r order by id) from requests r) as requests,
              (select json_agg(s order by id) from supports s) as supports,
              (select json_agg(a order by id) from accounts a) as accounts,
-             (select json_agg(s order by key) from settings s) as settings`)
+             (select json_agg(s order by key) from settings s) as settings,
+             (select json_agg(s order by id) from scores s) as scores,
+             (select json_agg(d order by id) from decisions d) as decisions,
+             (select json_agg(v order by id) from problem_versions v) as versions`)
   ).rows[0];
 
 describe("generateBrief", () => {
@@ -138,6 +141,8 @@ describe("generateBrief", () => {
       "We run payroll by hand every month.",
       "Brightside Bakery",
       "Move upmarket.",
+      // Reach and Business value, for the score breakdown.
+      '"arr":4800',
     ])
       expect(seen).toContain(evidence);
     expect(language.doGenerateCalls[0]?.reasoning).toBe("provider-default");
@@ -177,6 +182,46 @@ describe("generateBrief", () => {
       await generateBrief({ db, models }, { userId: people.priya, problemId }),
     ).toBe("failed");
     expect(language.doGenerateCalls).toHaveLength(8);
+  });
+
+  test("keeps only quotes copied from the request they cite", async () => {
+    let step = 0;
+    const brief = {
+      ...briefCiting(`request:${requestId}`),
+      quotes: [
+        { quote: "payroll by hand", source: `request:${requestId}` },
+        {
+          quote: "Payroll is our biggest pain.",
+          source: `request:${requestId}`,
+        },
+        { quote: "Move upmarket.", source: "strategy" },
+      ],
+    };
+    const { models } = scriptedModels({
+      generate: async () =>
+        step++ === 0 ? callTools(...TOOLS) : jsonResult(brief),
+    });
+
+    expect(
+      await generateBrief({ db, models }, { userId: people.priya, problemId }),
+    ).toBe("generated");
+    expect((await getLatestBrief({ db }, problemId))?.content.quotes).toEqual([
+      { quote: "payroll by hand", source: `request:${requestId}` },
+    ]);
+  });
+
+  test("a failed run is reported until a brief succeeds", async () => {
+    let step = 0;
+    const { models } = scriptedModels({
+      generate: async () =>
+        step++ === 0
+          ? callTools(...TOOLS)
+          : jsonResult(briefCiting("request:999")),
+    });
+    await generateBrief({ db, models }, { userId: people.priya, problemId });
+
+    expect(await getLatestBrief({ db }, problemId)).toBeNull();
+    expect(await lastBriefFailure({ db }, problemId)).toBeInstanceOf(Date);
   });
 
   test("only a PM generates a brief", async () => {
