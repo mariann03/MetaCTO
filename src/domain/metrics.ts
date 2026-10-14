@@ -12,7 +12,7 @@ export interface Rate {
 /** The median duration over `count` cases, null when there are none. */
 export interface Duration {
   count: number;
-  medianMinutes: number | null;
+  medianMs: number | null;
 }
 
 const rate = (count: number, of: number): Rate => ({
@@ -21,11 +21,11 @@ const rate = (count: number, of: number): Rate => ({
   rate: of === 0 ? null : count / of,
 });
 
-/** The median of `minutes` over the rows of `cases`, in SQL. */
+/** The median of `took` over the rows of `cases`, in milliseconds, in SQL. */
 const medianOf = (cases: string) =>
   sql.raw(`select count(*) as count,
-    percentile_cont(0.5) within group (order by extract(epoch from took) / 60)
-      as "medianMinutes"
+    percentile_cont(0.5) within group (order by extract(epoch from took) * 1000)
+      as "medianMs"
     from ${cases}`);
 
 /**
@@ -92,7 +92,7 @@ export async function computeMetrics({ db }: DbDeps) {
 
   const median = z.object({
     count: z.coerce.number(),
-    medianMinutes: z.coerce.number().nullable(),
+    medianMs: z.coerce.number().nullable(),
   });
   // Triaged: grouped by the AI with high confidence, or reviewed by a PM, whichever came
   // first; the clock starts at the request's first submission.

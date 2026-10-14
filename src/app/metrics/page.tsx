@@ -1,3 +1,4 @@
+import ms from "ms";
 import { Suspense } from "react";
 import { z } from "zod";
 import {
@@ -14,12 +15,8 @@ import latestEval from "../../../data/eval/latest.json";
 
 const percent = (v: number | null) =>
   v === null ? "–" : `${Math.round(v * 100)}%`;
-const duration = (minutes: number | null) => {
-  if (minutes === null) return "–";
-  if (minutes < 60) return `${Math.round(minutes)} min`;
-  if (minutes < 48 * 60) return `${(minutes / 60).toFixed(1)} h`;
-  return `${(minutes / 60 / 24).toFixed(1)} days`;
-};
+const duration = (valueMs: number | null) =>
+  valueMs === null ? "–" : ms(Math.round(valueMs), { long: true });
 
 // What the page reads from the eval's results; newer runs also carry the model time.
 const tier = z.object({ count: z.number(), precision: z.number().nullable() });
@@ -82,7 +79,7 @@ const rateCard = (value: Rate, unit: string) => ({
   detail: `${value.count} of ${value.of} ${unit}`,
 });
 const durationCard = (value: Duration, unit: string) => ({
-  value: duration(value.medianMinutes),
+  value: duration(value.medianMs),
   detail: `Median over ${value.count} ${unit}`,
 });
 

@@ -6,6 +6,7 @@ import {
   expect,
   test,
 } from "bun:test";
+import ms from "ms";
 import type { Db } from "@/db/client";
 import { events } from "@/db/schema";
 import {
@@ -31,12 +32,11 @@ afterAll(async () => {
 });
 
 const T0 = Date.parse("2026-10-01T09:00:00Z");
-const minutes = (n: number) => new Date(T0 + n * 60_000);
 
-/** Appends one event, at `at` minutes after T0. */
+/** Appends one event, `atMs` after T0. */
 function log(
   type: string,
-  at: number,
+  atMs: number,
   entity: { type: string; id: number },
   extra: {
     actor?: "user" | "pm" | "ai";
@@ -51,7 +51,7 @@ function log(
     entityType: entity.type,
     entityId: entity.id,
     payload: extra.payload ?? {},
-    createdAt: minutes(at),
+    createdAt: new Date(T0 + atMs),
   });
 }
 const request = (id: number) => ({ type: "request", id });
@@ -64,64 +64,64 @@ describe("computeMetrics", () => {
     // Request 1 starts Problem 10; the PM accepts it as new 30 minutes later.
     await log("request_submitted", 0, request(1), user);
     await log("problem_created", 0, problem(10), { payload: { requestId: 1 } });
-    await log("review_accepted", 30, request(1), {
+    await log("review_accepted", ms("30m"), request(1), {
       ...pm,
       payload: { problemId: 10 },
     });
     // Request 2 is grouped into Problem 10 with high confidence, and nobody touches it.
-    await log("request_submitted", 60, request(2), user);
-    await log("request_grouped", 61, request(2), {
+    await log("request_submitted", ms("60m"), request(2), user);
+    await log("request_grouped", ms("61m"), request(2), {
       payload: { problemId: 10, tier: "high" },
     });
     // Request 3 is grouped with high confidence too, but the PM moves it elsewhere.
-    await log("request_submitted", 120, request(3), user);
-    await log("request_grouped", 121, request(3), {
+    await log("request_submitted", ms("120m"), request(3), user);
+    await log("request_grouped", ms("121m"), request(3), {
       payload: { problemId: 10, tier: "high" },
     });
-    await log("grouping_overridden", 150, request(3), {
+    await log("grouping_overridden", ms("150m"), request(3), {
       ...pm,
       payload: { action: "move", fromProblemId: 10, toProblemId: 11 },
     });
     // Request 4 starts Problem 11, a duplicate of 10 the PM merges away later.
-    await log("request_submitted", 180, request(4), user);
-    await log("problem_created", 180, problem(11), {
+    await log("request_submitted", ms("180m"), request(4), user);
+    await log("problem_created", ms("180m"), problem(11), {
       payload: { requestId: 4 },
     });
-    await log("problem_merged", 300, problem(10), {
+    await log("problem_merged", ms("300m"), problem(10), {
       ...pm,
       payload: { sourceId: 11, requests: 2, supports: 2 },
     });
     // Someone +1s Problem 10 from the submit page instead of filing a fifth request.
-    await log("request_deflected", 200, problem(10), user);
+    await log("request_deflected", ms("200m"), problem(10), user);
     // Problem 10's supporters hear back 12 hours after it was created.
-    await log("update_approved", 720, problem(10), {
+    await log("update_approved", ms("720m"), problem(10), {
       ...pm,
       payload: { audience: "customer" },
     });
-    await log("update_approved", 730, problem(10), {
+    await log("update_approved", ms("730m"), problem(10), {
       ...pm,
       payload: { audience: "customer" },
     });
-    await log("update_approved", 10, problem(11), {
+    await log("update_approved", ms("10m"), problem(11), {
       ...pm,
       payload: { audience: "internal" },
     });
     // Problem 10 is scored (three criteria) and one score overridden, twice.
-    await log("problem_scored", 400, problem(10));
-    for (const at of [410, 420])
-      await log("score_overridden", at, problem(10), {
+    await log("problem_scored", ms("400m"), problem(10));
+    for (const atMs of [ms("410m"), ms("420m")])
+      await log("score_overridden", atMs, problem(10), {
         ...pm,
         payload: { criterion: "urgency" },
       });
     // Request 5's analysis fails; resubmitted, it starts Problem 12, which the PM's review
     // moves into Problem 10: another duplicate the AI missed.
-    await log("request_submitted", 500, request(5), user);
-    await log("analysis_failed", 501, request(5));
-    await log("request_submitted", 600, request(5), user);
-    await log("problem_created", 600, problem(12), {
+    await log("request_submitted", ms("500m"), request(5), user);
+    await log("analysis_failed", ms("501m"), request(5));
+    await log("request_submitted", ms("600m"), request(5), user);
+    await log("problem_created", ms("600m"), problem(12), {
       payload: { requestId: 5 },
     });
-    await log("grouping_overridden", 630, request(5), {
+    await log("grouping_overridden", ms("630m"), request(5), {
       ...pm,
       payload: { action: "move", fromProblemId: 12, toProblemId: 10 },
     });
@@ -136,9 +136,9 @@ describe("computeMetrics", () => {
       // Request 1 by the PM's review (30 min), 2 and 3 by a high-tier grouping (1 min each,
       // even though 3 was moved later), 5 by the review 130 min after its first submission;
       // 4 is still waiting for review.
-      timeToTriaged: { count: 4, medianMinutes: 15.5 },
-      // Only Problem 10 has a customer update: its first, 720 minutes after creation.
-      timeToFirstUpdate: { count: 1, medianMinutes: 720 },
+      timeToTriaged: { count: 4, medianMs: ms("15.5m") },
+      // Only Problem 10 has a customer update: its first, 12 hours after creation.
+      timeToFirstUpdate: { count: 1, medianMs: ms("12h") },
       overrides: {
         // Two moves and the merge, out of 5 AI grouping decisions (2 groupings, 3 new Problems).
         groupings: { count: 3, of: 5, rate: 0.6 },
@@ -154,8 +154,8 @@ describe("computeMetrics", () => {
       deflection: none,
       missedDuplicates: none,
       handsOff: none,
-      timeToTriaged: { count: 0, medianMinutes: null },
-      timeToFirstUpdate: { count: 0, medianMinutes: null },
+      timeToTriaged: { count: 0, medianMs: null },
+      timeToFirstUpdate: { count: 0, medianMs: null },
       overrides: { groupings: none, scores: none },
     });
   });
