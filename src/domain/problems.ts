@@ -68,6 +68,8 @@ export type ProblemSummary = Awaited<ReturnType<typeof listProblems>>[number];
  * A Problem as anyone may see it: its latest decision, its approved customer updates and the
  * requests behind it, oldest first. Requests are
  * anonymized: only the author's customer segment is shown, never who or which account.
+ * Requests our own team wrote (authors with no account) can name customers and their ARR,
+ * so only our team sees them.
  */
 export async function getProblem(
   { db }: DbDeps,
@@ -80,6 +82,11 @@ export async function getProblem(
     eq(problems.id, problemId),
   );
   if (!problem) return null;
+  const [viewer] = await db
+    .select({ accountId: users.accountId })
+    .from(users)
+    .where(eq(users.id, viewerId));
+  const internalViewer = viewer !== undefined && viewer.accountId === null;
   const requestsBehind = db
     .select({
       id: requests.id,
@@ -92,7 +99,11 @@ export async function getProblem(
     .innerJoin(users, eq(users.id, requests.authorId))
     .leftJoin(accounts, eq(accounts.id, users.accountId))
     .where(
-      and(eq(requests.problemId, problemId), eq(requests.status, "submitted")),
+      and(
+        eq(requests.problemId, problemId),
+        eq(requests.status, "submitted"),
+        internalViewer ? undefined : isNotNull(users.accountId),
+      ),
     )
     .orderBy(asc(requests.createdAt), asc(requests.id));
   const decision = latestDecision(db, problemId);

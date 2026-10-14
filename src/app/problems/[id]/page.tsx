@@ -43,7 +43,8 @@ const AUDIENCE = {
   internal: "Internal update (Sales and Customer Success)",
 } as const;
 
-// Requests are anonymized: who asked is shown only as their customer segment.
+// Requests are anonymized: who asked is shown only as their customer segment. Requests by
+// our own team (no segment) are shown only to our team.
 const ASKED_BY: Record<Segment, string> = {
   smb: "An SMB customer",
   mid_market: "A Mid-market customer",
@@ -147,7 +148,7 @@ async function ProblemDetail({
               className="space-y-1 p-4"
             >
               <p className="text-muted-foreground text-sm">
-                {request.segment ? ASKED_BY[request.segment] : "A customer"}
+                {request.segment ? ASKED_BY[request.segment] : "Our team"}
               </p>
               <p className="font-medium">{request.title}</p>
               <p className="whitespace-pre-line">{request.description}</p>
