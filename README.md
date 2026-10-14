@@ -25,7 +25,7 @@ The guiding principle is **AI drafts and scores, the PM decides**. Every AI outp
 - **Prioritize**: weight five criteria with sliders. Reach and Business value are computed from supporters and ARR; Strategic fit, Urgency and Effort are AI scores, each with a rationale citing requests. Scores go stale when evidence or the strategy changes, and the PM rescores and overrides with a reason.
 - **Decide and communicate**: generate a decision brief (an agent gathers the evidence and cites every claim), record a decision with a public rationale, then edit and approve two AI-drafted updates, one for customers and one for Sales and CS.
 - **Measure**: business and AI-quality metrics from the event log, next to the latest offline evaluation.
-- **Settings**: the strategy document, the clarifying-question limit and the matching mode; the matching thresholds are read-only, set by the eval.
+- **Settings**: the strategy document, the clarifying-question limit and the matching mode; the matching thresholds are read-only: set by the eval, or provisional until it has enough evidence.
 
 There is no login: a header switcher acts as any seeded customer or PM.
 
@@ -67,7 +67,7 @@ bun run test:e2e       # Playwright against a production build with a determinis
 bun run eval           # matching accuracy on the labeled fixtures (replays from the cache)
 ```
 
-**Tracing (optional).** `bun run langfuse:up` starts a local Langfuse on http://localhost:3001 (`bun run langfuse:down` stops it, keeping its data) (login `dev@example.com` / `local-password`). Uncomment the three `LANGFUSE_*` lines in `.env` and restart the app: every AI call then appears as a trace with its prompt, output, tokens and latency, including the brief agent's tool calls. Without them, tracing is not loaded at all.
+**Tracing (optional).** `bun run langfuse:up` starts a local Langfuse on http://localhost:3001 (login `dev@example.com` / `local-password`); `bun run langfuse:down` stops it and keeps its data. Uncomment the three `LANGFUSE_*` lines in `.env` and restart the app: every AI call then appears as a trace with its prompt, output, tokens and latency, including the brief agent's tool calls. Without them, tracing is not loaded at all.
 
 ## Deploying
 
@@ -100,7 +100,7 @@ Next.js 16 (App Router, server actions)        src/app, src/components
 
 - **Deterministic pipelines over agents.** Intake, clarifying questions, statement updates, scoring and update drafts are each a single structured-output call with fixed inputs. They are testable against labeled data and cannot loop. The one open-ended task, the decision brief, is the one agent: a `ToolLoopAgent` with six read-only tools bound to one Problem and a cap of 8 steps.
 - **Matching combines two signals.** A request's embedding finds the closest Problems (each at its best-matching request); then one model call extracts the underlying need and gives a categorical verdict (`same_problem`, `related_but_different`, `different`) against the top 3. The model's self-reported confidence is uncalibrated, so it is not used. The **tier** comes from the verdict and the similarity together: high auto-groups, medium groups and asks a PM, low starts a new Problem (which a PM also reviews).
-- **Thresholds are tuned, not guessed.** `bun run eval` replays the 150 labeled requests, tunes the thresholds on a ~100 request training split, and reports on ~50 held out. Auto-grouping is enabled only where its precision is *confidently* at least 95% (the lower bound of a 95% Wilson interval). With today's data that bar is rarely met, so almost everything goes through review. That is deliberate: a wrong auto-group is worse than a review.
+- **Thresholds are tuned, not guessed.** `bun run eval` replays the 150 labeled requests, tunes the thresholds on a ~100 request training split, and reports on ~50 held out. The eval sets the auto-grouping threshold only where its precision is *confidently* at least 95% (the lower bound of a 95% Wilson interval), and turns auto-grouping off if what it observed falls below that. Today's data is too little evidence either way, so the provisional threshold stays, and it auto-groups almost nothing (one held-out request, correctly): nearly everything goes through review. That is deliberate: a wrong auto-group is worse than a review.
 - **Thinking is on for intake.** Comparing six setups showed that letting gemma4:12b think groups 11–19 points more duplicates at the same or better precision, for about 3 times the latency (30 s median per submission). Bigger models, more candidates and prompt changes did worse. Everything else runs with thinking off, except the brief agent. See [`docs/eval-intake-setups.md`](docs/eval-intake-setups.md).
 - **Provider independence.** Each tier (intake, reasoning, embedding) is an env setting resolved through the AI SDK provider registry: Ollama by default, Anthropic, OpenAI or Voyage by changing one line.
 - **Reproducibility.** Model answers are cached by request parameters and committed, so the seed and the eval replay offline and the numbers in this repo can be regenerated without a GPU. The E2E suite uses a deterministic fake model instead.
@@ -120,14 +120,14 @@ The PM Metrics page computes, in SQL over the event log:
 
 | Goal | Metric |
 |---|---|
-| Fewer duplicates | Deflection rate (a +1 instead of a new request); missed-duplicate rate (AI-created Problems a PM later merged away or emptied in review) |
+| Fewer duplicates | Deflection rate (a +1 instead of a new request); missed-duplicate rate (AI-created Problems a PM later merged away, or whose founding request a PM moved to another Problem in review) |
 | Less triage effort | Hands-off rate (confident groupings no PM touched); median time to triaged |
 | Faster stakeholder response | Median time from a Problem's creation to its supporters' first approved update |
-| Guardrail | PM override rate of AI groupings, merges and scores |
+| Guardrail | PM override rate of AI groupings (moves, splits, merges) and of AI scores |
 
-Before real usage, the offline evaluation is the baseline, shown on the same page. On the held-out requests the adopted setup groups 53% of duplicates correctly with 77% precision on the requests it sends to review, keeps 80% of new needs separate, and finds the right Problem among its 3 candidates 76% of the time.
+Before real usage, the offline evaluation is the baseline, shown on the same page. On the held-out requests the adopted setup groups 53% of duplicates correctly with 77% precision on the requests it sends to review, and keeps 80% of new needs separate. Across all 150 requests, the right Problem is among its 3 candidates 76% of the time.
 
-**On real data.** The fixtures are synthetic, so the same setup is also measured on 325 real microsoft/vscode feature requests, 103 of them duplicates its maintainers marked (`bun run eval --dataset vscode`). Their duplicate labels are incomplete, so precision there is a lower bound. On the held-out requests it groups 82% of duplicates correctly, with at least 55% precision on the requests it sends to review, keeps at least 73% of new needs separate, and finds the right Problem among its 3 candidates 90% of the time, at the same 30 s median. Real duplicates are often close restatements, so they are easier to find than the fixtures'. All of the wrong groupings put a request with no duplicate mark into an existing Problem; how many are real mistakes would take hand labeling. Details in `docs/eval-intake-setups.md`.
+**On real data.** The fixtures are synthetic, so the same setup is also measured on 325 real microsoft/vscode feature requests, 103 of them duplicates its maintainers marked (`bun run eval --dataset vscode`). Their duplicate labels are incomplete, so precision there is a lower bound. On the held-out requests it groups 82% of duplicates correctly, with at least 55% precision on the requests it sends to review, and keeps at least 73% of new needs separate, at the same 30 s median. Across all 325, the right Problem is among its 3 candidates 90% of the time. Real duplicates are often close restatements, so they are easier to find than the fixtures'. All of the wrong groupings put a request with no duplicate mark into an existing Problem; how many are real mistakes would take hand labeling. Details in `docs/eval-intake-setups.md`.
 
 ## Assumptions
 

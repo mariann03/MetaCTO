@@ -100,7 +100,7 @@ Open **Metrics**. Business impact and AI quality come from the event log:
 
 Below them is the offline evaluation baseline: 53% of held-out duplicates grouped, at 77% review precision.
 
-Mention the comparison behind the intake setup (`docs/eval-intake-setups.md`): thinking on beat a bigger model, more candidates and two prompt rewrites. Also mention the check on real vscode issues (README, *On real data*).
+Mention the comparison behind the intake setup (`docs/eval-intake-setups.md`): thinking on beat a bigger model, more candidates and two prompt rewrites. Also mention the check on real vscode feature requests (README, *On real data*).
 
 ## 10. Under the hood (optional, 30 s)
 
