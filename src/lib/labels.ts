@@ -23,3 +23,6 @@ export const JUDGED_LABELS: Record<Judged, string> = {
   urgency: "Urgency",
   effort: "Effort (rough guess)",
 };
+
+/** Who wrote a statement version. */
+export const AUTHOR_LABELS = { ai: "AI", pm: "PM", user: "Customer" } as const;

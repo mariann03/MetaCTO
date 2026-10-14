@@ -234,8 +234,7 @@ async function reassign(
     .values({ problemId: to, userId: request.authorId, requestId: request.id })
     .onConflictDoNothing();
 
-  // ponytail: a submission grouped into `from` at this same instant fails and its request
-  // becomes a draft to resubmit; lock the Problem row in intake's attach if that matters.
+  // Intake's attach holds a key-share lock, so a request joining `from` right now keeps it.
   await tx
     .delete(problems)
     .where(

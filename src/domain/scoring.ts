@@ -47,7 +47,8 @@ const scoringSchema = z.object({
 /**
  * Fingerprint of the evidence on a Problem: its submitted requests and +1 notes. A score
  * whose fingerprint no longer matches was made before the evidence changed, so it is stale.
- * Ids suffice: requests and notes are never edited.
+ * Ids suffice: requests are never edited, and a note only ever appears (written with a +1,
+ * or kept from a duplicate support by a merge), which changes which supports match.
  */
 // Aliased, because Drizzle leaves columns unqualified in single-table selects, which would
 // bind them to the subquery's own table.

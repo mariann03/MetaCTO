@@ -19,7 +19,7 @@ Trend/emerging-need detection, intake from Slack/email/Zendesk, Jira/Linear sync
 ## Domain model
 
 - **Request** — the submitter's raw title + description, never modified by AI. Author, account, source, timestamps, `status: draft | submitted`. Belongs to exactly one Problem once submitted.
-- **Problem** — the cluster. AI-maintained canonical problem statement, tags, list of proposed solution ideas. PM can edit, lock, merge, split. Statement versions are stored; PM-locked statements are never overwritten by AI.
+- **Problem** — the cluster. AI-maintained canonical problem statement, tags, list of proposed solution ideas. PM can edit, lock, merge, split. Statement versions are stored; PM-locked statements are never overwritten by AI. A merge moves the duplicate's (source's) requests and supports into the target, counting a supporter of both once (keeping their note if the target's support has none), deletes the source and logs `problem_merged`; the target's scores go stale on their own. A source with a decision is refused, since its updates and supporters' notifications would go with it, so the PM merges the other way. Edits (`statement_edited`, a PM-authored version) and lock changes are logged.
 - **Support** — attaches to a Problem, unique per user per Problem. Submitting a Request is implicit support; "+1, this affects me" adds support with an optional "how does this affect you?" note that becomes evidence. Merges dedupe support.
 - **Account** — seeded customer data: ARR, segment, churn-risk flag.
 - **Event** — append-only log of every action (`type`, `actor: user | pm | ai`, `entityId`, `payload`, `createdAt`). Powers metrics and the audit trail.

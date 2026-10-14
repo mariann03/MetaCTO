@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { z } from "zod";
+import { MergeForm, StatementForm } from "@/components/curation-controls";
 import {
   DecisionForm,
   DraftForm,
@@ -10,16 +11,22 @@ import { ProblemStatusBadge } from "@/components/problem-status";
 import { ScoreValue } from "@/components/score-value";
 import { OverrideForm, RescoreButton } from "@/components/scoring-controls";
 import { SupportButton } from "@/components/support-button";
+import { isStatementLocked, listVersions } from "@/domain/curation";
 import {
   DECISIONS,
   latestDecision,
   listDrafts,
   listInternalUpdates,
 } from "@/domain/decisions";
-import { getProblem } from "@/domain/problems";
+import { getProblem, listProblems } from "@/domain/problems";
 import { JUDGED } from "@/domain/ranking";
 import { getScores } from "@/domain/scoring";
-import { JUDGED_LABELS, type Segment, STATUS_LABELS } from "@/lib/labels";
+import {
+  AUTHOR_LABELS,
+  JUDGED_LABELS,
+  type Segment,
+  STATUS_LABELS,
+} from "@/lib/labels";
 import { plural } from "@/lib/utils";
 import { deps } from "@/server/deps";
 import { getSession } from "@/server/session";
@@ -79,6 +86,14 @@ async function ProblemDetail({
           supported={problem.supported}
         />
       </header>
+
+      {current.role === "pm" && (
+        <Curation
+          problemId={problem.id}
+          statement={problem.statement}
+          viewerId={current.id}
+        />
+      )}
 
       {current.role === "pm" && <Scores problemId={problem.id} />}
 
@@ -237,6 +252,58 @@ async function Communication({ problemId }: { problemId: number }) {
           </ul>
         </div>
       )}
+    </section>
+  );
+}
+
+/** PM only: rewrite and lock the statement, see who wrote each version, merge a duplicate. */
+async function Curation({
+  problemId,
+  statement,
+  viewerId,
+}: {
+  problemId: number;
+  statement: string;
+  viewerId: number;
+}) {
+  const [locked, versions, all] = await Promise.all([
+    isStatementLocked(deps, problemId),
+    listVersions(deps, problemId),
+    // ponytail: every Problem fills the picker (71 on the seed); search past a few hundred.
+    listProblems(deps, { viewerId }),
+  ]);
+  const targets = all
+    .filter((p) => p.id !== problemId)
+    .map((p) => ({ value: String(p.id), label: p.statement }));
+  return (
+    <section aria-label="Curate" className="space-y-4">
+      <h2 className="font-semibold text-lg">Curate</h2>
+      <StatementForm
+        // Remount after each save, so the form shows the stored statement.
+        key={`${statement}|${locked}`}
+        problemId={problemId}
+        statement={statement}
+        locked={locked}
+      />
+      <details>
+        <summary className="cursor-pointer text-sm">
+          Statement history ({versions.length})
+        </summary>
+        <ol
+          aria-label="Statement history"
+          className="mt-2 divide-y rounded-md border"
+        >
+          {versions.map((v) => (
+            <li key={v.id} className="space-y-1 p-3 text-sm">
+              <p>{v.statement}</p>
+              <p className="text-muted-foreground text-xs">
+                {AUTHOR_LABELS[v.author]} · {dateFormat.format(v.createdAt)}
+              </p>
+            </li>
+          ))}
+        </ol>
+      </details>
+      <MergeForm problemId={problemId} targets={targets} />
     </section>
   );
 }
