@@ -10,6 +10,9 @@ import { registerTelemetry } from "ai";
  * LANGFUSE_BASE_URL from the environment.
  */
 export function startTracing() {
-  new NodeSDK({ spanProcessors: [new LangfuseSpanProcessor()] }).start();
+  new NodeSDK({
+    serviceName: "feature-intelligence",
+    spanProcessors: [new LangfuseSpanProcessor()],
+  }).start();
   registerTelemetry(new LangfuseVercelAiSdkIntegration());
 }
