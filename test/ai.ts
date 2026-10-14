@@ -18,11 +18,14 @@ export function axisVector(axis: number): number[] {
 export function scriptedModels({
   generate,
   embed = () => axisVector(0),
+  provider,
 }: {
   generate: Generate;
   embed?: (text: string) => number[];
+  /** The provider the language model claims to be, for provider-specific paths. */
+  provider?: string;
 }) {
-  const language = new MockLanguageModelV4({ doGenerate: generate });
+  const language = new MockLanguageModelV4({ doGenerate: generate, provider });
   const embedding = new MockEmbeddingModelV4({
     provider: "test",
     modelId: "test-embedding",

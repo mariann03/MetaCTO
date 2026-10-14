@@ -96,7 +96,12 @@ const briefCiting = (cite: string) => ({
     { text: "One SMB account, $4,800 ARR.", sources: ["account:1"] },
   ],
   quotes: [{ quote: "We run payroll by hand every month.", source: cite }],
-  scores: [{ text: "Not scored yet.", sources: [`problem:${problemId}`] }],
+  scores: [
+    {
+      text: "Not scored yet.",
+      sources: [`problem:${problemId}`, "score:history"],
+    },
+  ],
   options: [
     { text: "Automate payroll runs.", sources: [cite] },
     { text: "Import payroll from a provider.", sources: ["strategy"] },
@@ -182,6 +187,72 @@ describe("generateBrief", () => {
       await generateBrief({ db, models }, { userId: people.priya, problemId }),
     ).toBe("failed");
     expect(language.doGenerateCalls).toHaveLength(8);
+  });
+
+  test("on Ollama, the tools run without the brief's schema and a final call writes it", async () => {
+    // Ollama enforces a response schema on decoding, so a step that carries one can't call tools.
+    let step = 0;
+    const { models, language } = scriptedModels({
+      provider: "ollama",
+      generate: async () => {
+        step++;
+        if (step === 1) return callTools(...TOOLS);
+        if (step === 2) return jsonResult({});
+        return jsonResult(briefCiting(`request:${requestId}`));
+      },
+    });
+
+    expect(
+      await generateBrief({ db, models }, { userId: people.priya, problemId }),
+    ).toBe("generated");
+    const [gather, done, write] = language.doGenerateCalls;
+    for (const call of [gather, done])
+      expect(call?.responseFormat?.type).not.toBe("json");
+    expect(write?.responseFormat?.type).toBe("json");
+    // Writing to a schema, the model thinks only while gathering: qwen otherwise answers empty.
+    expect(write?.reasoning).toBe("none");
+    expect(write?.tools ?? []).toEqual([]);
+    expect(JSON.stringify(write?.prompt)).toContain(
+      "We run payroll by hand every month.",
+    );
+    expect((await getLatestBrief({ db }, problemId))?.content).toEqual(
+      briefCiting(`request:${requestId}`),
+    );
+  });
+
+  test("on Ollama, an agent that never stops calling tools fails without writing", async () => {
+    const { models, language } = scriptedModels({
+      provider: "ollama",
+      generate: async () => callTools("get_problem"),
+    });
+
+    expect(
+      await generateBrief({ db, models }, { userId: people.priya, problemId }),
+    ).toBe("failed");
+    expect(language.doGenerateCalls).toHaveLength(8);
+  });
+
+  test("a brief with an empty claim or quote fails", async () => {
+    for (const empty of [
+      { statement: { text: "", sources: [`problem:${problemId}`] } },
+      { quotes: [{ quote: "", source: `request:${requestId}` }] },
+    ]) {
+      let step = 0;
+      const { models } = scriptedModels({
+        generate: async () =>
+          step++ === 0
+            ? callTools(...TOOLS)
+            : jsonResult({ ...briefCiting(`request:${requestId}`), ...empty }),
+      });
+
+      expect(
+        await generateBrief(
+          { db, models },
+          { userId: people.priya, problemId },
+        ),
+      ).toBe("failed");
+    }
+    expect(await getLatestBrief({ db }, problemId)).toBeNull();
   });
 
   test("keeps only quotes copied from the request they cite", async () => {
