@@ -76,7 +76,7 @@ export async function listCriteria({ db }: DbDeps) {
     .where(notInArray(problems.status, DECIDED))
     .orderBy(asc(problems.id));
 
-  const judged = await listScores(db);
+  const judged = await listScores({ db });
   return rows.map(({ smb, midMarket, enterprise, ...criteria }) => ({
     ...criteria,
     segments: { smb, mid_market: midMarket, enterprise },

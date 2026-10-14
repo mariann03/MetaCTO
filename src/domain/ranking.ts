@@ -5,20 +5,14 @@ import type { ProblemCriteria } from "./prioritization";
 export const JUDGED = ["strategicFit", "urgency", "effort"] as const;
 export type Judged = (typeof JUDGED)[number];
 
-export const CRITERIA = [
-  "reach",
-  "businessValue",
-  "strategicFit",
-  "urgency",
-  "effort",
-] as const;
+export const CRITERIA = ["reach", "businessValue", ...JUDGED] as const;
 export type Criterion = (typeof CRITERIA)[number];
 export type Weights = Record<Criterion, number>;
 
 // ARR of accounts at risk of churning counts twice. Segment mix is shown, not scored: ARR already follows it.
 const value = (p: ProblemCriteria) => p.arr + p.churnRiskArr;
 // AI scores run 1 to 5; one never scored counts as the middle, neither helping nor hurting.
-const judged = (score: { value: number } | null) =>
+const scaled = (score: { value: number } | null) =>
   score ? (score.value - 1) / 4 : 0.5;
 
 /**
@@ -45,10 +39,10 @@ export function rank(problems: ProblemCriteria[], weights: Weights) {
         reach:
           (p.supporters / most.supporters + p.accounts / most.accounts) / 2,
         businessValue: value(p) / most.value,
-        strategicFit: judged(p.judged.strategicFit),
-        urgency: judged(p.judged.urgency),
+        strategicFit: scaled(p.judged.strategicFit),
+        urgency: scaled(p.judged.urgency),
         // Less effort ranks higher.
-        effort: 1 - judged(p.judged.effort),
+        effort: 1 - scaled(p.judged.effort),
       };
       const weighted = CRITERIA.reduce(
         (sum, c) => sum + weights[c] * scores[c],

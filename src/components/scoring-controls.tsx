@@ -47,6 +47,7 @@ export function RescoreButton({ problemId }: { problemId: number }) {
           Scoring failed. Try again.
         </p>
       )}
+      {state.status === "forbidden" && <Forbidden />}
     </form>
   );
 }
@@ -64,13 +65,20 @@ export function RescoreStaleButton({ due }: { due: number }) {
       </p>
     );
   return (
-    <form action={action}>
+    <form action={action} className="flex items-center gap-3">
       <Button type="submit" size="sm" disabled={pending || due === 0}>
         Rescore all stale ({due})
       </Button>
+      {state.status === "forbidden" && <Forbidden />}
     </form>
   );
 }
+
+const Forbidden = () => (
+  <p role="alert" className="text-destructive text-sm">
+    Only product managers can rescore.
+  </p>
+);
 
 /** Replaces an AI score with the PM's, saying why. */
 export function OverrideForm({
@@ -86,21 +94,25 @@ export function OverrideForm({
   const valueId = useId();
   const [open, setOpen] = useState(false);
   const [state, action, pending] = useActionState(
-    (prev: OverrideState, form: FormData) =>
-      overrideScoreAction(problemId, criterion, prev, form),
+    async (prev: OverrideState, form: FormData) => {
+      const next = await overrideScoreAction(problemId, criterion, prev, form);
+      if (next.status === "overridden") setOpen(false);
+      return next;
+    },
     idle as OverrideState,
   );
-  if (state.status === "overridden")
-    return (
-      <p role="status" className="text-sm">
-        Override saved.
-      </p>
-    );
   if (!open)
     return (
-      <Button size="sm" variant="ghost" onClick={() => setOpen(true)}>
-        Override {name}
-      </Button>
+      <div className="flex items-center gap-3">
+        <Button size="sm" variant="ghost" onClick={() => setOpen(true)}>
+          Override {name}
+        </Button>
+        {state.status === "overridden" && (
+          <p role="status" className="text-sm">
+            Override saved.
+          </p>
+        )}
+      </div>
     );
   return (
     <form action={action} className="space-y-2">
@@ -135,6 +147,11 @@ export function OverrideForm({
       {state.status === "invalid" && (
         <p role="alert" className="text-destructive text-sm">
           Pick a score from 1 to 5 and say why.
+        </p>
+      )}
+      {state.status === "forbidden" && (
+        <p role="alert" className="text-destructive text-sm">
+          Only product managers can override scores.
         </p>
       )}
       {state.status === "unscored" && (

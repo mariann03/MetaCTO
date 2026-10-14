@@ -15,8 +15,8 @@ export function StrategyForm({ strategy }: { strategy: string }) {
     <form action={action} className="space-y-2">
       <Label htmlFor="strategy">Strategy</Label>
       <p className="text-muted-foreground text-sm">
-        The AI judges Strategic fit against this. Saving marks every score
-        stale; nothing rescores until you ask.
+        The AI judges Strategic fit against this. Saving a change marks every
+        score stale; nothing rescores until you ask.
       </p>
       <Textarea
         id="strategy"

@@ -10,7 +10,6 @@ import {
   sql,
 } from "drizzle-orm";
 import { z } from "zod";
-import type { Db } from "@/db/client";
 import { events, problems, requests, scores, supports } from "@/db/schema";
 import type { DbDeps, Deps } from "./deps";
 import { requirePm } from "./directory";
@@ -36,6 +35,7 @@ const judgementSchema = z.object({
   score: z.number().int().min(1).max(5),
   citedRequestIds: z
     .array(z.number().int())
+    .min(1)
     .describe("Ids of the requests the rationale rests on."),
 });
 const scoringSchema = z.object({
@@ -46,7 +46,8 @@ const scoringSchema = z.object({
 
 /**
  * Fingerprint of the evidence on a Problem: its submitted requests and +1 notes. A score
- * whose fingerprint no longer matches was made before new evidence arrived, so it is stale.
+ * whose fingerprint no longer matches was made before the evidence changed, so it is stale.
+ * Ids suffice: requests and notes are never edited.
  */
 // Aliased, because Drizzle leaves columns unqualified in single-table selects, which would
 // bind them to the subquery's own table.
@@ -94,7 +95,7 @@ export async function scoreProblem({ db, models }: Deps, problemId: number) {
         .select({ note: supports.note })
         .from(supports)
         .where(and(eq(supports.problemId, problemId), isNotNull(supports.note)))
-        .orderBy(desc(supports.createdAt))
+        .orderBy(desc(supports.createdAt), desc(supports.id))
         .limit(EVIDENCE_LIMIT);
       return { ...problem, requests: shown, notes };
     },
@@ -189,7 +190,7 @@ export interface Score {
 export type Judgements = Record<Judged, Score | null>;
 
 /** Every Problem's scores (or one Problem's), null where it was never scored. */
-export async function listScores(db: Db, problemId?: number) {
+export async function listScores({ db }: DbDeps, problemId?: number) {
   const rows = await db
     .select({
       problemId: scores.problemId,
@@ -227,6 +228,11 @@ export async function listScores(db: Db, problemId?: number) {
   return byProblem;
 }
 
+/** One Problem's scores, null where it was never scored. */
+export async function getScores(deps: DbDeps, problemId: number) {
+  return (await listScores(deps, problemId)).get(problemId) ?? unscored();
+}
+
 /** Stale or never scored: what "Rescore all stale" picks up. */
 export const needsScoring = (judged: Judgements) =>
   JUDGED.some((c) => judged[c]?.stale !== false);
@@ -258,7 +264,7 @@ export async function rescoreStale(deps: Deps, { userId }: { userId: number }) {
       .from(problems)
       .where(notInArray(problems.status, DECIDED))
       .orderBy(asc(problems.id)),
-    listScores(deps.db),
+    listScores(deps),
   ]);
   const due = open.filter(({ id }) =>
     needsScoring(scored.get(id) ?? unscored()),
@@ -295,6 +301,8 @@ export async function overrideScore(
   await requirePm({ db }, userId, "override a score");
   const why = reason.trim();
   if (!why) throw new Error("An override needs a reason");
+  if (!Number.isInteger(value) || value < 1 || value > 5)
+    throw new Error(`An override is a score from 1 to 5, not ${value}`);
   return db.transaction(async (tx) => {
     const [row] = await tx
       .update(scores)

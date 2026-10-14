@@ -6,20 +6,14 @@ import { ScoreValue } from "@/components/score-value";
 import { OverrideForm, RescoreButton } from "@/components/scoring-controls";
 import { SupportButton } from "@/components/support-button";
 import { getProblem } from "@/domain/problems";
-import { JUDGED, type Judged } from "@/domain/ranking";
-import { listScores, unscored } from "@/domain/scoring";
-import type { Segment } from "@/lib/labels";
+import { JUDGED } from "@/domain/ranking";
+import { getScores } from "@/domain/scoring";
+import { JUDGED_LABELS, type Segment } from "@/lib/labels";
 import { plural } from "@/lib/utils";
 import { deps } from "@/server/deps";
 import { getSession } from "@/server/session";
 
 // Requests are anonymized: who asked is shown only as their customer segment.
-const JUDGED_NAME: Record<Judged, string> = {
-  strategicFit: "Strategic fit",
-  urgency: "Urgency",
-  effort: "Effort (a rough guess)",
-};
-
 const ASKED_BY: Record<Segment, string> = {
   smb: "An SMB customer",
   mid_market: "A Mid-market customer",
@@ -103,8 +97,7 @@ async function ProblemDetail({
 
 /** PM only: the AI's scores with rationale and cited requests, rescore and override. */
 async function Scores({ problemId }: { problemId: number }) {
-  const judged =
-    (await listScores(deps.db, problemId)).get(problemId) ?? unscored();
+  const judged = await getScores(deps, problemId);
   return (
     <section aria-label="Scores" className="space-y-3">
       <div className="flex items-center justify-between gap-4">
@@ -117,11 +110,11 @@ async function Scores({ problemId }: { problemId: number }) {
           return (
             <li
               key={criterion}
-              aria-label={JUDGED_NAME[criterion]}
+              aria-label={JUDGED_LABELS[criterion]}
               className="space-y-2 p-4"
             >
               <div className="flex items-center justify-between gap-4">
-                <span className="font-medium">{JUDGED_NAME[criterion]}</span>
+                <span className="font-medium">{JUDGED_LABELS[criterion]}</span>
                 <ScoreValue score={score} />
               </div>
               {score && (
@@ -147,7 +140,7 @@ async function Scores({ problemId }: { problemId: number }) {
                   <OverrideForm
                     problemId={problemId}
                     criterion={criterion}
-                    name={JUDGED_NAME[criterion]}
+                    name={JUDGED_LABELS[criterion]}
                   />
                 </>
               )}

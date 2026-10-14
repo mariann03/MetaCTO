@@ -8,7 +8,7 @@ import {
 } from "bun:test";
 import { eq } from "drizzle-orm";
 import type { Db } from "@/db/client";
-import { events } from "@/db/schema";
+import { events, requests } from "@/db/schema";
 import { candidateIds, jsonResult, scriptedModels } from "../../test/ai";
 import {
   prepareDatabase,
@@ -194,6 +194,21 @@ describe("staleness", () => {
     expect(await stale(payroll)).toBe(false);
   });
 
+  test("a request leaving the Problem (e.g. moved by a review) makes it stale too", async () => {
+    const payroll = (await submit("Payroll")).problemId;
+    const receipts = (await submit("Receipts")).problemId;
+    const { requestId } = await submit("Payroll", people.bob);
+    await scoreProblem(deps(db), payroll);
+    await scoreProblem(deps(db), receipts);
+
+    await db
+      .update(requests)
+      .set({ problemId: receipts })
+      .where(eq(requests.id, requestId));
+
+    expect([await stale(payroll), await stale(receipts)]).toEqual([true, true]);
+  });
+
   test("a plain +1 is not new evidence", async () => {
     const { problemId } = await submit("Payroll");
     await scoreProblem(deps(db), problemId);
@@ -301,6 +316,18 @@ describe("overrideScore", () => {
     await scoreProblem(deps(db), problemId);
     await expect(override(people.alice, "Already built.")).rejects.toThrow();
     await expect(override(people.priya, "  ")).rejects.toThrow();
+    await expect(
+      overrideScore(
+        { db },
+        {
+          userId: people.priya,
+          problemId,
+          criterion: "effort",
+          value: 6,
+          reason: "Off the scale.",
+        },
+      ),
+    ).rejects.toThrow();
     expect((await judgedOf(problemId))?.effort?.override).toBeNull();
   });
 });

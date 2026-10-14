@@ -17,24 +17,16 @@ import {
   CRITERIA,
   type Criterion,
   JUDGED,
-  type Judged,
   rank,
   type Weights,
 } from "@/domain/ranking";
-import { SEGMENT_LABELS } from "@/lib/labels";
+import { JUDGED_LABELS, SEGMENT_LABELS } from "@/lib/labels";
 import { plural } from "@/lib/utils";
 
 const NAME: Record<Criterion, string> = {
   reach: "Reach",
   businessValue: "Business value",
-  strategicFit: "Strategic fit",
-  urgency: "Urgency",
-  effort: "Effort (less ranks higher)",
-};
-const JUDGED_NAME: Record<Judged, string> = {
-  strategicFit: "Strategic fit",
-  urgency: "Urgency",
-  effort: "Effort (guess)",
+  ...JUDGED_LABELS,
 };
 const MAX_WEIGHT = 10;
 const DEFAULT_WEIGHT = 5;
@@ -62,7 +54,7 @@ export function Ranking({ criteria }: { criteria: ProblemCriteria[] }) {
     <div className="space-y-6">
       <fieldset className="grid max-w-3xl gap-4 sm:grid-cols-3">
         <legend className="mb-2 text-muted-foreground text-sm">
-          Weights (0 to {MAX_WEIGHT})
+          Weights (0 to {MAX_WEIGHT}; less effort ranks higher)
         </legend>
         {CRITERIA.map((criterion) => (
           <div key={criterion} className="space-y-2">
@@ -93,7 +85,7 @@ export function Ranking({ criteria }: { criteria: ProblemCriteria[] }) {
             <TableHead>Reach</TableHead>
             <TableHead>Business value</TableHead>
             {JUDGED.map((c) => (
-              <TableHead key={c}>{JUDGED_NAME[c]}</TableHead>
+              <TableHead key={c}>{JUDGED_LABELS[c]}</TableHead>
             ))}
             <TableHead className="text-right">Score</TableHead>
           </TableRow>
