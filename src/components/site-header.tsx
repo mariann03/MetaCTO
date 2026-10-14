@@ -18,6 +18,7 @@ export async function SiteHeader() {
             <>
               <Link href="/review">Review</Link>
               <Link href="/priorities">Priorities</Link>
+              <Link href="/metrics">Metrics</Link>
               <Link href="/settings">Settings</Link>
             </>
           )}
