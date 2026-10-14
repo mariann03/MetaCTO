@@ -234,3 +234,38 @@ describe("collectObservations", () => {
     expect(observations[2]?.candidates[0]?.cluster).toBe("p-1");
   });
 });
+
+describe("collectObservations with another intake setup", () => {
+  test("offers the model as many candidates as the setup asks, at its reasoning level", async () => {
+    const { models, language } = scriptedModels({
+      embed: (text) => axisVector(Number(text.split(" ")[1])),
+      generate: async () =>
+        jsonResult({
+          problemStatement: "s",
+          underlyingProblem: "x",
+          proposedSolution: "",
+          persona: "Owner",
+          severity: "low",
+          match: { verdict: "different", problemId: null, rationale: "r" },
+        }),
+    });
+    // Four different needs on four axes, so each is a candidate for the last request.
+    const requests = [1, 2, 3, 4, 5].map((n) => ({
+      key: `r-${n}`,
+      problemKey: null,
+      split: "train" as const,
+      title: `Need ${n}`,
+      description: "",
+    }));
+
+    const observations = await collectObservations(models, requests, {
+      candidates: 2,
+      reasoning: "low",
+    });
+
+    expect(observations[4]?.candidates).toHaveLength(2);
+    expect(language.doGenerateCalls.map((c) => c.reasoning)).toEqual(
+      Array(5).fill("low"),
+    );
+  });
+});

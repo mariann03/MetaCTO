@@ -3,8 +3,9 @@ import type { Models } from "@/ai/models";
 import {
   ANALYSIS_ATTEMPTS,
   analyzeRequest,
-  CANDIDATE_COUNT,
   embeddingText,
+  INTAKE_SETUP,
+  type IntakeSetup,
   PROVISIONAL_THRESHOLDS,
   placeRequest,
   type ThresholdBasis,
@@ -236,6 +237,7 @@ export interface EvalRequest {
 export async function collectObservations(
   models: Pick<Models, "intake" | "embedding">,
   requests: EvalRequest[],
+  setup: IntakeSetup = INTAKE_SETUP,
   onProgress: (done: number, total: number) => void = () => {},
 ): Promise<Observation[]> {
   const clusters = new Map<
@@ -259,13 +261,14 @@ export async function collectObservations(
         ),
       }))
       .sort((a, b) => b.similarity - a.similarity)
-      .slice(0, CANDIDATE_COUNT);
+      .slice(0, setup.candidates);
 
     let analysis: Awaited<ReturnType<typeof analyzeRequest>> | undefined;
     for (let attempt = 1; attempt <= ANALYSIS_ATTEMPTS && !analysis; attempt++)
       analysis = await analyzeRequest(models, {
         request,
         mode: "hybrid",
+        reasoning: setup.reasoning,
         candidates: ranked.map((c) => ({
           problemId: c.id,
           similarity: c.similarity,
