@@ -411,3 +411,7 @@ Response: Merged PR #33 (#14 closed). Suggested #7 (clarifying questions) next; 
 [2026-10-14T06:05:00Z]
 Prompt: /mattpocock-skills:implement #7
 Response: Branch feat/7-clarifying-questions. On Next, a fast-tier call (thinking off) asks up to maxClarifyingQuestions questions when a request names a solution without the need (0 skips the call); each is optional and skippable; answers are stored with the request, shown on the Problem page and added to the intake prompt (unchanged without answers, so cached answers replay); the PM sets the limit (0-3) in Settings. Also fixed the #23 seed to leave a Problem unscored when its scoring is rejected, and restarted it.
+
+[2026-10-14T07:10:00Z]
+Prompt: can we do something else in the meanwhile?
+Response: Committed the #17 work in progress and drafted the README on feat/18-readme (local setup, architecture, AI design decisions, human-in-the-loop points, metrics, assumptions, risks and trade-offs), which needs no models while the seed runs. Deploy and #19 wait on decisions.
