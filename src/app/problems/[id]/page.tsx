@@ -10,7 +10,12 @@ import { ProblemStatusBadge } from "@/components/problem-status";
 import { ScoreValue } from "@/components/score-value";
 import { OverrideForm, RescoreButton } from "@/components/scoring-controls";
 import { SupportButton } from "@/components/support-button";
-import { DECISIONS, listDrafts, listInternalUpdates } from "@/domain/decisions";
+import {
+  DECISIONS,
+  latestDecision,
+  listDrafts,
+  listInternalUpdates,
+} from "@/domain/decisions";
 import { getProblem } from "@/domain/problems";
 import { JUDGED } from "@/domain/ranking";
 import { getScores } from "@/domain/scoring";
@@ -91,12 +96,7 @@ async function ProblemDetail({
         )}
       </section>
 
-      {current.role === "pm" && (
-        <Communication
-          problemId={problem.id}
-          decided={problem.decision !== null}
-        />
-      )}
+      {current.role === "pm" && <Communication problemId={problem.id} />}
 
       <section aria-label="Updates" className="space-y-2">
         <h2 className="font-semibold text-lg">Updates</h2>
@@ -198,17 +198,15 @@ async function Scores({ problemId }: { problemId: number }) {
 }
 
 /** PM only: record a decision, then edit and approve the two drafted updates. */
-async function Communication({
-  problemId,
-  decided,
-}: {
-  problemId: number;
-  decided: boolean;
-}) {
-  const [drafts, internal] = await Promise.all([
+async function Communication({ problemId }: { problemId: number }) {
+  const [drafts, internal, latest] = await Promise.all([
     listDrafts(deps, problemId),
     listInternalUpdates(deps, problemId),
+    latestDecision(deps.db, problemId),
   ]);
+  // Drafting failed, or was never finished: some audience has neither a draft nor its update.
+  const undrafted =
+    latest !== null && drafts.length === 0 && latest.approved.length < 2;
   return (
     <section aria-label="Decide and update" className="space-y-4">
       <h2 className="font-semibold text-lg">Decide and update</h2>
@@ -226,7 +224,7 @@ async function Communication({
           ))}
         </div>
       )}
-      {decided && <DraftUpdatesButton problemId={problemId} />}
+      {undrafted && <DraftUpdatesButton problemId={problemId} />}
       {internal.length > 0 && (
         <div className="space-y-2">
           <h3 className="font-medium">Approved internal updates</h3>

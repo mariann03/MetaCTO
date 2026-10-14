@@ -33,6 +33,8 @@ const STRATEGY = "Move upmarket: win Enterprise accounts.";
 const NOTE = "We lose two days every month-end.";
 
 let failDrafts = false;
+// When set, draft calls wait for it, so a test can overlap two decisions.
+let gate: Promise<void> | null = null;
 /** Intake: every request starts its own Problem. Drafts: echo the audience they were asked for. */
 const scripted = () =>
   scriptedModels({
@@ -40,10 +42,13 @@ const scripted = () =>
       const text = JSON.stringify(prompt);
       if (text.includes("<decision>")) {
         if (failDrafts) throw new Error("Model down");
+        const waiting = gate;
+        if (waiting) await waiting;
+        const why = /<rationale>(.*?)<\/rationale>/.exec(text)?.[1];
         return jsonResult({
           body: text.includes("<accounts>")
             ? "Internal: talking points"
-            : "We plan to build it.",
+            : `We plan to build it. ${why}`,
         });
       }
       if (text.includes("<current_statement>"))
@@ -72,6 +77,7 @@ beforeAll(async () => {
 });
 beforeEach(async () => {
   failDrafts = false;
+  gate = null;
   await resetDatabase(db);
   people = await seedPeople(db);
   await writeStrategy(db, STRATEGY);
@@ -110,7 +116,7 @@ describe("recordDecision", () => {
     expect(
       (await listDrafts({ db }, problemId)).map((d) => [d.audience, d.body]),
     ).toEqual([
-      ["customer", "We plan to build it."],
+      ["customer", "We plan to build it. Most asked for."],
       ["internal", "Internal: talking points"],
     ]);
     expect(
@@ -174,11 +180,34 @@ describe("recordDecision", () => {
     expect(await listDrafts({ db }, problemId)).toHaveLength(2);
   });
 
-  test("a new decision replaces the drafts nobody approved", async () => {
+  test("a new decision replaces the drafts nobody approved, even when drafting fails", async () => {
     await decide();
     await decide(undefined, "Changed our minds.");
+    expect(
+      (await listDrafts({ db }, problemId)).map((d) => d.body)[0],
+    ).toContain("Changed our minds.");
 
-    expect(await listDrafts({ db }, problemId)).toHaveLength(2);
+    failDrafts = true;
+    await decide(undefined, "Again.");
+    expect(await listDrafts({ db }, problemId)).toEqual([]);
+  });
+
+  test("drafts for a decision overtaken while drafting are dropped", async () => {
+    let release = () => {};
+    gate = new Promise((resolve) => {
+      release = resolve;
+    });
+    const slow = decide(undefined, "First thoughts.");
+    // Let the slow drafting reach the model before the second decision.
+    await Bun.sleep(50);
+    gate = null;
+    await decide(undefined, "Changed our minds.");
+    release();
+    await slow;
+
+    const drafts = await listDrafts({ db }, problemId);
+    expect(drafts).toHaveLength(2);
+    expect(drafts[0]?.body).toContain("Changed our minds.");
   });
 });
 
@@ -201,6 +230,11 @@ describe("approveUpdate", () => {
       "approved",
     );
     expect(await approve(updateId, "Again.")).toBe("already_approved");
+    // Drafting again leaves what was already delivered alone.
+    await draftUpdates(deps(db), { userId: people.priya, problemId });
+    expect(
+      (await listDrafts({ db }, problemId)).map((d) => d.audience),
+    ).toEqual(["internal"]);
 
     for (const userId of [people.alice, people.bob])
       expect(
@@ -238,6 +272,7 @@ describe("approveUpdate", () => {
 
     await expect(approve(updateId, "Hi", people.alice)).rejects.toThrow();
     await expect(approve(updateId, "  ")).rejects.toThrow();
+    expect(await approve(404, "Gone.")).toBe("missing");
     expect(await listNotifications({ db }, people.alice)).toEqual([]);
   });
 });

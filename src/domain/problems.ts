@@ -23,6 +23,7 @@ import {
   updates,
   users,
 } from "@/db/schema";
+import { latestDecision } from "./decisions";
 import type { DbDeps, Deps } from "./deps";
 import { embeddingText, findCandidates } from "./intake";
 
@@ -79,7 +80,7 @@ export async function getProblem(
     eq(problems.id, problemId),
   );
   if (!problem) return null;
-  const behind = await db
+  const requestsBehind = db
     .select({
       id: requests.id,
       title: requests.title,
@@ -93,14 +94,9 @@ export async function getProblem(
       and(eq(requests.problemId, problemId), eq(requests.status, "submitted")),
     )
     .orderBy(asc(requests.createdAt), asc(requests.id));
-  const [decision] = await db
-    .select({ status: decisions.status, rationale: decisions.rationale })
-    .from(decisions)
-    .where(eq(decisions.problemId, problemId))
-    .orderBy(desc(decisions.createdAt), desc(decisions.id))
-    .limit(1);
+  const decision = latestDecision(db, problemId);
   // The public feed: approved customer updates, newest first.
-  const feed = await db
+  const feed = db
     .select({
       id: updates.id,
       body: updates.body,
@@ -116,11 +112,19 @@ export async function getProblem(
       ),
     )
     .orderBy(desc(updates.approvedAt), desc(updates.id));
+  const [behind, decided, published] = await Promise.all([
+    requestsBehind,
+    decision,
+    feed,
+  ]);
   return {
     ...problem,
-    decision: decision ?? null,
+    decision: decided && {
+      status: decided.status,
+      rationale: decided.rationale,
+    },
     requests: behind,
-    updates: feed,
+    updates: published,
   };
 }
 

@@ -152,6 +152,11 @@ export function DraftForm({
           Write the update before approving it.
         </p>
       )}
+      {state.status === "missing" && (
+        <p role="alert" className="text-sm">
+          This draft was replaced. Reload to see the current one.
+        </p>
+      )}
       {state.status === "already_approved" && (
         <p role="alert" className="text-sm">
           This update was already approved.
